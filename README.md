@@ -38,10 +38,6 @@ mkdir -p ~/rebot_ws/src && cd ~/rebot_ws/src
 # 克隆仓库
 git clone https://github.com/Eaglewzw/rebot_ros2_control.git
 
-# 安装 rosdep 依赖
-cd ~/rebot_ws
-rosdep install --from-paths src --ignore-src -r -y
-
 # 编译
 colcon build --symlink-install
 source install/setup.bash
@@ -72,12 +68,6 @@ ros2 action send_goal /joint_trajectory_controller/follow_joint_trajectory ...
 # 夹爪控制
 ros2 action send_goal /gripper_controller/gripper_action ...
 ```
-
-## 🔧 开发指南
-
-1. **修改 URDF**: 编辑 `rebot_description/urdf/rebot.urdf.xacro`
-2. **注册新控制器**: 在 `rebot_controllers/config/controllers.yaml` 中配置
-3. **硬件接口**: 实现 `rebot_hardware/` 下的 `ros2_control::SystemInterface`
 
 ## 📄 License
 
