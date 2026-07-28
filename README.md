@@ -19,17 +19,6 @@
 - **MoveIt2 集成**: 运动规划 + 碰撞检测 + 轨迹生成
 - **Gazebo / Ignition 仿真**: 无需硬件即可开发和测试
 
-## 🏗️ 架构
-
-```
-rebot_ros2_control/
-├── rebot_description/       # 机械臂 URDF / 网格文件
-├── rebot_hardware/          # ros2_control 硬件接口实现
-├── rebot_controllers/       # 控制器配置文件
-├── rebot_moveit_config/     # MoveIt2 运动规划配置
-├── rebot_bringup/           # 启动脚本 & 参数
-└── README.md
-```
 
 ### 框架概览
 
@@ -50,16 +39,6 @@ rebot_ros2_control/
 
 ## 🚀 快速开始
 
-### 依赖
-
-| 依赖 | 版本 |
-|------|------|
-| Ubuntu | 22.04 (Jammy) |
-| ROS2 | Humble |
-| ros2_control | humble |
-| ros2_controllers | humble |
-| MoveIt2 | humble |
-| Gazebo | Ignition Fortress |
 
 ### 安装
 
