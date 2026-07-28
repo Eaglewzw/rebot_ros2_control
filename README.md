@@ -1,8 +1,12 @@
 # reBot ROS2 Control
 
+<div align="center">
+
 [![ROS2](https://img.shields.io/badge/ROS2-Humble-blue?logo=ros)](https://docs.ros.org/en/humble/)
 [![License](https://img.shields.io/badge/License-Apache%202.0-green.svg)](LICENSE)
 [![Build](https://img.shields.io/badge/build-unknown-lightgrey)](https://github.com/Eaglewzw/rebot_ros2_control)
+
+</div>
 
 基于 [ROS2 Control](https://control.ros.org/master/index.html) 框架的 **reBot 机械臂** 控制项目。
 
