@@ -1,15 +1,16 @@
 # ==============================================================================
 # reBot ros2_control controllers config (Mock mode)
 #
-# auto_start:  controller_manager 启动时自动加载并激活
-#           false = 需要手动 ros2 control load/set_state 激活 (推荐调试)
+# - controller_manager.ros__parameters      → type for each controller
+# - <controller_name>.ros__parameters       → runtime params for each controller
+#
+# Both sections MUST have ros__parameters for the ROS2 param-file parser.
 # ==============================================================================
 
 controller_manager:
   ros__parameters:
-    update_rate: 100                               # Hz，控制循环频率
+    update_rate: 100
 
-    # ---------- 控制器清单 ----------
     joint_state_broadcaster:
       type: joint_state_broadcaster/JointStateBroadcaster
 
@@ -20,27 +21,14 @@ controller_manager:
       type: position_controllers/JointGroupPositionController
 
 # ==============================================================================
-# Joint State Broadcaster — 读取硬件状态 → 发布 /joint_states
-# ==============================================================================
+
 joint_state_broadcaster:
   ros__parameters:
-    joints:
-      - joint1
-      - joint2
-      - joint3
-      - joint4
-      - joint5
-      - joint6
-      - gripper_joint
-    interface_names:
-      - position
-      - velocity
-    state_publish_rate: 100.0                       # Hz
+    state_publish_rate: 100.0
+    use_local_topics: false
 
 # ==============================================================================
-# Joint Trajectory Controller — 轨迹跟踪 (MoveIt2 输出入口)
-# 对 revolute 关节使用 position + velocity 前馈
-# ==============================================================================
+
 joint_trajectory_controller:
   ros__parameters:
     joints:
@@ -51,26 +39,25 @@ joint_trajectory_controller:
       - joint5
       - joint6
 
-    # 接口匹配：必须与 URDF <ros2_control> 的 command_interface 一致
     command_interfaces:
       - position
       - velocity
+
     state_interfaces:
       - position
       - velocity
 
-    state_publish_rate:   50.0                      # Hz，控制器状态回读频率
-    action_monitor_rate:  20.0                      # Hz，action 目标监控频率
+    state_publish_rate:   50.0
+    action_monitor_rate:  20.0
 
-    allow_partial_joints_goal: false                # 拒绝不完整的轨迹目标
-
-    open_loop_control: false                        # false = 闭环 PID
+    allow_partial_joints_goal: false
+    open_loop_control: false
+    allow_nonzero_velocity_at_trajectory_end: false
 
     constraints:
-      stopped_velocity_tolerance: 0.01              # 关节到达判断：速度 < 0.01 rad/s
-      goal_time: 0.0                                # 0 = 尽快到达
+      stopped_velocity_tolerance: 0.01
+      goal_time: 0.0
 
-    # PID 增益 (Mock 模式下仅用于接口验证，不影响物理行为)
     gains:
       joint1: { p: 100.0,  i: 0.0,  d: 5.0,   i_clamp: 10.0,  ff_velocity: 1.0 }
       joint2: { p: 200.0,  i: 0.0,  d: 10.0,  i_clamp: 10.0,  ff_velocity: 1.0 }
@@ -80,13 +67,8 @@ joint_trajectory_controller:
       joint6: { p: 80.0,   i: 0.0,  d: 4.0,   i_clamp: 5.0,   ff_velocity: 1.0 }
 
 # ==============================================================================
-# Gripper Controller — 夹爪组位置控制 (两个 prismatic 关节同步)
-# ==============================================================================
+
 gripper_controller:
   ros__parameters:
     joints:
       - gripper_joint
-    command_interfaces:
-      - position
-    state_interfaces:
-      - position

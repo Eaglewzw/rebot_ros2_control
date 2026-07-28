@@ -25,7 +25,7 @@ find_package(control_msgs REQUIRED)
 
 # Install config and launch
 install(
-  DIRECTORY config/ launch/
+  DIRECTORY config launch
   DESTINATION share/${PROJECT_NAME}
 )
 

@@ -6,7 +6,7 @@ find_package(ament_cmake REQUIRED)
 
 # Install MoveIt configuration files
 install(
-  DIRECTORY config/ launch/ rviz/
+  DIRECTORY config launch rviz
   DESTINATION share/${PROJECT_NAME}
 )
 

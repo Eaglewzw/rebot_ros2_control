@@ -10,9 +10,8 @@
 # ==============================================================================
 
 from launch import LaunchDescription
-from launch.actions import DeclareLaunchArgument, RegisterEventHandler, LogInfo
+from launch.actions import DeclareLaunchArgument
 from launch.conditions import IfCondition
-from launch.event_handlers import OnProcessStart
 from launch.substitutions import (
     Command,
     FindExecutable,
@@ -21,6 +20,7 @@ from launch.substitutions import (
 )
 
 from launch_ros.actions import Node
+from launch_ros.parameter_descriptions import ParameterValue
 from launch_ros.substitutions import FindPackageShare
 
 
@@ -40,95 +40,88 @@ def generate_launch_description():
     pkg_description = FindPackageShare("rebot_description")
 
     urdf_path = PathJoinSubstitution([pkg_description, "urdf", "rebot_b601_rs.urdf"])
+    rviz_config_path = PathJoinSubstitution(
+        [pkg_description, "rviz", "rebot.rviz"]
+    )
     controllers_path = PathJoinSubstitution(
         [pkg_bringup, "config", "ros2_control_controllers.yaml"]
     )
 
     # ---- Robot description (plain URDF, xacro passthrough-safe) ----
-    robot_description = {
-        "robot_description": Command([FindExecutable(name="xacro"), " ", urdf_path])
+    robot_description_content = Command([FindExecutable(name="xacro"), " ", urdf_path])
+    robot_description_param = {
+        "robot_description": ParameterValue(robot_description_content, value_type=str)
     }
 
     # ==========================================================================
-    # 1. ros2_control_node — controller_manager + hardware interface host
+    # 1. ros2_control_node
+    #    - robot_description passed via remap (matching official demo pattern)
+    #    - controllers YAML passed as parameter file
     # ==========================================================================
     controller_manager_node = Node(
         package="controller_manager",
         executable="ros2_control_node",
-        parameters=[robot_description, controllers_path],
+        parameters=[controllers_path],
+        remappings=[
+            ("~/robot_description", "/robot_description"),
+        ],
         output="both",
-        # The node name doubles as the controller_manager service namespace.
-        # Spawners below use `--controller-manager controller_manager` (the default).
-        name="controller_manager",
     )
 
     # ==========================================================================
-    # 2. robot_state_publisher — URDF → TF tree (reads /joint_states)
+    # 2. robot_state_publisher — publishes URDF to /robot_description topic,
+    #    then publishes TF tree from /joint_states
     # ==========================================================================
     robot_state_publisher_node = Node(
         package="robot_state_publisher",
         executable="robot_state_publisher",
-        parameters=[robot_description],
+        parameters=[robot_description_param],
         output="both",
     )
 
     # ==========================================================================
-    # 3. Controller spawners — load + configure + activate via controller_manager
-    #
-    #    joint_state_broadcaster:  reads hardware → /joint_states  (auto_start)
-    #    joint_trajectory_controller: MoveIt2 / action goal entry  (--activate)
-    #    gripper_controller:          group position for parallel gripper
-    #
-    #    Spawners wait for the controller_manager service before proceeding.
+    # 3. Controller spawners
     # ==========================================================================
 
-    # joint_state_broadcaster — publish-only, no goal interface needed
     joint_state_spawner = Node(
         package="controller_manager",
         executable="spawner",
-        arguments=[
-            "joint_state_broadcaster",
-            "--controller-manager", "controller_manager",
-        ],
+        arguments=["joint_state_broadcaster"],
         output="both",
     )
 
-    # joint_trajectory_controller — main arm motion (position + velocity FF)
     joint_trajectory_spawner = Node(
         package="controller_manager",
         executable="spawner",
-        arguments=[
-            "joint_trajectory_controller",
-            "--controller-manager", "controller_manager",
-            "--activate",
-        ],
+        arguments=["joint_trajectory_controller", "--activate"],
         output="both",
     )
 
-    # gripper_controller — single-driving-joint for parallel gripper
     gripper_spawner = Node(
         package="controller_manager",
         executable="spawner",
-        arguments=[
-            "gripper_controller",
-            "--controller-manager", "controller_manager",
-            "--activate",
-        ],
+        arguments=["gripper_controller", "--activate"],
         output="both",
     )
 
     # ==========================================================================
-    # 4. RViz2 — visual feedback (RobotModel + TF)
+    # 4. RViz2
     # ==========================================================================
     rviz_node = Node(
         package="rviz2",
         executable="rviz2",
+        arguments=[
+            "-d",
+            rviz_config_path,
+            "-f",
+            "world",
+        ],
         condition=IfCondition(use_rviz),
         output="both",
     )
 
     # ==========================================================================
-    # Assembly — all nodes launch concurrently; spawners auto-wait on services.
+    # Assembly
     # ==========================================================================
     return LaunchDescription(
         [
