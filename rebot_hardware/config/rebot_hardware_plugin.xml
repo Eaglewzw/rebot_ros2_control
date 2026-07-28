@@ -1,0 +1,10 @@
+<library path="rebot_hardware">
+  <class name="rebot_hardware/ReBotSystemHardware"
+         type="rebot_hardware::ReBotSystemHardware"
+         base_class_type="hardware_interface::SystemInterface">
+    <description>
+      reBot 6-DOF robotic arm system hardware interface.
+      Communicates with real hardware or simulation via ros2_control.
+    </description>
+  </class>
+</library>
