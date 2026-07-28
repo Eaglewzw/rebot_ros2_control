@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="utf-8"?>
+<package format="3">
+  <name>rebot_bringup</name>
+  <version>0.1.0</version>
+  <description>Top-level launch scripts and configuration to bring up the reBot robot in simulation or on real hardware.</description>
+
+  <maintainer email="1460853569@qq.com">Eaglewzw</maintainer>
+  <license>Apache-2.0</license>
+
+  <buildtool_depend>ament_cmake</buildtool_depend>
+
+  <depend>rebot_description</depend>
+  <depend>rebot_hardware</depend>
+  <depend>rebot_controllers</depend>
+  <depend>rebot_moveit_config</depend>
+  <depend>controller_manager</depend>
+  <depend>robot_state_publisher</depend>
+  <depend>joint_state_publisher_gui</depend>
+  <depend>rviz2</depend>
+  <depend>ros2launch</depend>
+
+  <!-- Optional: only needed for simulation -->
+  <exec_depend>ros_gz_sim</exec_depend>
+  <exec_depend>ros_gz_bridge</exec_depend>
+
+  <test_depend>ament_lint_auto</test_depend>
+  <test_depend>ament_lint_common</test_depend>
+
+  <export>
+    <build_type>ament_cmake</build_type>
+  </export>
+</package>

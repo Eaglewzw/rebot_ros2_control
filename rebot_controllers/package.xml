@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="utf-8"?>
+<package format="3">
+  <name>rebot_controllers</name>
+  <version>0.1.0</version>
+  <description>Custom ros2_controllers configuration and implementations for reBot.</description>
+
+  <maintainer email="1460853569@qq.com">Eaglewzw</maintainer>
+  <license>Apache-2.0</license>
+
+  <buildtool_depend>ament_cmake</buildtool_depend>
+
+  <depend>controller_interface</depend>
+  <depend>controller_manager</depend>
+  <depend>joint_trajectory_controller</depend>
+  <depend>joint_state_broadcaster</depend>
+  <depend>forward_command_controller</depend>
+  <depend>position_controllers</depend>
+  <depend>gripper_controllers</depend>
+  <depend>rclcpp</depend>
+  <depend>pluginlib</depend>
+  <depend>std_msgs</depend>
+  <depend>control_msgs</depend>
+
+  <test_depend>ament_lint_auto</test_depend>
+  <test_depend>ament_lint_common</test_depend>
+
+  <export>
+    <build_type>ament_cmake</build_type>
+  </export>
+</package>
