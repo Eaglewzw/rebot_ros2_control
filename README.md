@@ -23,7 +23,7 @@
 ### 框架概览
 
 <p align="center">
-  <img src="assets/rebot_ros2_control.png" alt="框架概览" width="80%">
+  <img src="assets/rebot_ros2_control.png" alt="框架概览" width="50%">
 </p>
 
 ## 🚀 快速开始

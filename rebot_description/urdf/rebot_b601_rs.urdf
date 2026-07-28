@@ -751,7 +751,7 @@
     </collision>
   </link>
   <joint
-    name="joint_left"
+    name="gripper_joint"
     type="prismatic">
     <origin
       xyz="-0.041939 -7.3385E-05 0"
@@ -855,9 +855,12 @@
       effort="500"
       velocity="10" />
     <dynamics damping="5.0" friction="0.5" />
+    <!-- joint_right mimics gripper_joint with -1.0 multiplier:
+         both fingers are driven by a single motor + mechanical linkage -->
+    <mimic joint="gripper_joint" multiplier="-1.0" offset="0.0" />
   </joint>
 
-  <!-- Gazebo Harmonic native position controllers. Commands are radians for
+  <!-- ===== Gazebo Harmonic native position controllers. Commands are radians for
        joint1..joint6 and metres for the parallel gripper. -->
   <gazebo>
     <plugin filename="gz-sim-joint-state-publisher-system" name="gz::sim::systems::JointStatePublisher" />
@@ -884,10 +887,86 @@
       <joint_name>joint6</joint_name><topic>/rebot/joint6/cmd_pos</topic><p_gain>50</p_gain><d_gain>2</d_gain><cmd_max>14</cmd_max><cmd_min>-14</cmd_min>
     </plugin>
     <plugin filename="gz-sim-joint-position-controller-system" name="gz::sim::systems::JointPositionController">
-      <joint_name>joint_left</joint_name><topic>/rebot/gripper/cmd_pos</topic><p_gain>250</p_gain><d_gain>25</d_gain><cmd_max>500</cmd_max><cmd_min>-500</cmd_min>
+      <joint_name>gripper_joint</joint_name><topic>/rebot/gripper/cmd_pos</topic><p_gain>250</p_gain><d_gain>25</d_gain><cmd_max>500</cmd_max><cmd_min>-500</cmd_min>
     </plugin>
     <plugin filename="gz-sim-joint-position-controller-system" name="gz::sim::systems::JointPositionController">
       <joint_name>joint_right</joint_name><topic>/rebot/gripper/cmd_pos</topic><p_gain>250</p_gain><d_gain>25</d_gain><cmd_max>500</cmd_max><cmd_min>-500</cmd_min>
     </plugin>
   </gazebo>
+
+  <!-- ===== ros2_control Mock hardware ===== -->
+  <ros2_control name="RebotSystemMock" type="system">
+    <hardware>
+      <plugin>mock_components/GenericSystem</plugin>
+      <param name="calculate_dynamics">false</param>
+    </hardware>
+
+    <!-- Joint 1: base → link1, revolute -->
+    <joint name="joint1">
+      <command_interface name="position"/>
+      <command_interface name="velocity"/>
+      <command_interface name="effort"/>
+      <state_interface    name="position"/>
+      <state_interface    name="velocity"/>
+      <state_interface    name="effort"/>
+    </joint>
+
+    <!-- Joint 2: link1 → link2, revolute -->
+    <joint name="joint2">
+      <command_interface name="position"/>
+      <command_interface name="velocity"/>
+      <command_interface name="effort"/>
+      <state_interface    name="position"/>
+      <state_interface    name="velocity"/>
+      <state_interface    name="effort"/>
+    </joint>
+
+    <!-- Joint 3: link2 → link3, revolute -->
+    <joint name="joint3">
+      <command_interface name="position"/>
+      <command_interface name="velocity"/>
+      <command_interface name="effort"/>
+      <state_interface    name="position"/>
+      <state_interface    name="velocity"/>
+      <state_interface    name="effort"/>
+    </joint>
+
+    <!-- Joint 4: link3 → link4, revolute -->
+    <joint name="joint4">
+      <command_interface name="position"/>
+      <command_interface name="velocity"/>
+      <command_interface name="effort"/>
+      <state_interface    name="position"/>
+      <state_interface    name="velocity"/>
+      <state_interface    name="effort"/>
+    </joint>
+
+    <!-- Joint 5: link4 → link5, revolute -->
+    <joint name="joint5">
+      <command_interface name="position"/>
+      <command_interface name="velocity"/>
+      <command_interface name="effort"/>
+      <state_interface    name="position"/>
+      <state_interface    name="velocity"/>
+      <state_interface    name="effort"/>
+    </joint>
+
+    <!-- Joint 6: link5 → link6, revolute -->
+    <joint name="joint6">
+      <command_interface name="position"/>
+      <command_interface name="velocity"/>
+      <command_interface name="effort"/>
+      <state_interface    name="position"/>
+      <state_interface    name="velocity"/>
+      <state_interface    name="effort"/>
+    </joint>
+
+    <!-- Joint left: gripper_end → gripper_left, prismatic -->
+    <joint name="gripper_joint">
+      <command_interface name="position"/>
+      <command_interface name="velocity"/>
+      <state_interface    name="position"/>
+      <state_interface    name="velocity"/>
+    </joint>
+  </ros2_control>
 </robot>
