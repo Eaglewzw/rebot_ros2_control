@@ -22,7 +22,9 @@
 
 ### 框架概览
 
-![reBot ROS2 Control 框架概览](assets/rebot_ros2_control.png)
+<p align="center">
+  <img src="assets/rebot_ros2_control.png" alt="框架概览" width="80%">
+</p>
 
 ## 🚀 快速开始
 
