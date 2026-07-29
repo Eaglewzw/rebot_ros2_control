@@ -37,6 +37,7 @@ rebot_description/   URDF/xacro 与 meshes
 rebot_hardware/      C++ 硬件插件 + 达妙协议驱动（damiao_motor_driver / serial_can_bridge）+ 单元测试
 rebot_msgs/          MitJointCommand 消息（MIT 五元组）
 rebot_controllers/   自定义控制器 ×5（MIT 直通 / 重力补偿 / MIT 轨迹 / 阻抗 / 遥操作流）+ 单元测试
+rebot_teleop_joy/    单只 Joy-Con 体感遥操（关节/末端双模式）+ 最小伺服管线 + 单元测试
 rebot_bringup/       bringup.launch.py、ros2_control_controllers.yaml
 rebot_moveit_config/ MoveIt2 配置（预留）
 ```
@@ -115,6 +116,24 @@ ros2 action send_goal /gripper_controller/gripper_cmd \
 - **板载环 vs 软件闭环**（阻抗 `mode` 参数）：onboard 闭环在电机电流环（kHz 级），
   不受 controller_manager 100 Hz 限制，推荐默认；software 闭环受更新周期与总线延迟限制，
   高刚度易振荡，但增益不受 MIT 编码范围（kp≤500/kd≤5）约束。真机实测结论待阶段 5 补充。
+
+## 🎮 Joy-Con 体感遥操（rebot_teleop_joy）
+
+单只 Joy-Con（右手柄优先、左手柄自动回退）以 IMU 姿态 + 摇杆 + 按键遥操整臂，
+两种模式在 launch 时选定：
+
+```bash
+pip install --user hidapi pyglm scipy numpy          # 非 rosdep 依赖
+ros2 launch rebot_teleop_joy joy_teleop.launch.py teleop_mode:=joint       # 关节遥操
+ros2 launch rebot_teleop_joy joy_teleop.launch.py teleop_mode:=cartesian   # 末端遥操
+```
+
+- **ZR/ZL 是 deadman 兼离合**：按下锚定、按住跟踪、松开立即冻结；"松开-转手-再按下"
+  完成重锚定，解决手腕活动范围问题。
+- **启动强制 IMU 标定**：把手柄平放桌面静置约 2 秒，标定完成前拒绝一切运动命令。
+- 配对流程、左右手柄双模式**可打印按键速查卡**、索引实测方法、安全语义表与设计决策记录
+  见 [rebot_teleop_joy/README.md](rebot_teleop_joy/README.md)。
+- IMU 获取部分改编自 [Eaglewzw/JoyReBot](https://github.com/Eaglewzw/JoyReBot)（vendor 目录）。
 
 ## 🔌 串口权限
 
