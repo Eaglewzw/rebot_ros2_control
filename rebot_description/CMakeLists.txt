@@ -4,9 +4,9 @@ project(rebot_description)
 # Find dependencies
 find_package(ament_cmake REQUIRED)
 
-# Install URDF, meshes, launch, and RViz files
+# Install URDF, meshes, and RViz files
 install(
-  DIRECTORY urdf meshes launch rviz
+  DIRECTORY urdf meshes rviz
   DESTINATION share/${PROJECT_NAME}
 )
 
