@@ -43,3 +43,16 @@ servo_minimal:
     base_link: base_link
     tip_link: link6
     pose_timeout: 0.3
+
+    # IK backend. PlaCo provides QP-enforced position/velocity constraints;
+    # when the optional module is absent the node logs a warning and uses DLS.
+    ik_solver: placo              # placo | dls
+    placo_solve_iterations: 1     # re-linearizations within one control period
+
+    # Values aligned with Eaglewzw/JoyReBot's proven teleoperation tuning.
+    position_weight: 100.0
+    orientation_weight: 0.35      # position wins by about 300:1
+    joint_margin: 0.02            # rad inside each URDF hard limit
+    max_joint_speed: 0.7          # rad/s, enforced independently of rate
+    position_tolerance: 0.004     # m
+    orientation_tolerance: 0.015  # rad

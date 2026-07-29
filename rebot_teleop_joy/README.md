@@ -12,8 +12,8 @@ IMU 获取部分改编自 [Eaglewzw/JoyReBot](https://github.com/Eaglewzw/JoyReB
 ## 1. 快速开始
 
 ```bash
-# 依赖（非 rosdep 的 Python 包）
-pip install --user hidapi pyglm scipy numpy
+# 依赖（非 rosdep 的 Python 包；placo 是推荐的末端 QP IK 后端）
+pip install --user hidapi pyglm scipy numpy placo
 
 # 允许非 root 访问 Joy-Con HID 设备（否则需 sudo 运行）
 sudo tee /etc/udev/rules.d/50-joycon.rules <<'EOF'
@@ -151,7 +151,8 @@ ros2 topic echo /rebot_teleop_joy/status      # 状态机与档位
 | IMU 姿态跳变（>25 rad/s） | 丢帧并冻结一个周期；连续 5 帧强制松开 deadman 状态 | `attitude_gate.py` |
 | 回 Home 执行中按任意键 | 立即中断并保持当前位置 | `TeleopStateMachine`：HOMING 任意键 → IDLE |
 | 接近软限位（余量 5°） | 该方向速度/增量线性衰减至 0，反方向不受限 | `joint_mapper.limit_margin_factor()` |
-| 奇异位形（末端模式） | IK 降速（最小奇异值 <阈值 时按比例缩放），状态透传到 `~/status` | `kinematics.py` / `servo_minimal.py` |
+| 关节限位/速度限位（末端模式） | PlaCo 默认在 QP 内施加硬约束，并在输出前独立复核；DLS 回退后端执行限幅与安全余量钳位 | `placo_backend.py` / `kinematics.py` |
+| 奇异位形（DLS 回退后端） | 最小奇异值低于阈值时提高阻尼并按比例降速，状态透传到 `~/status` | `kinematics.py` / `servo_minimal.py` |
 
 **安全链设计**：本节点在非 ENGAGED 状态**什么都不发布**（而非发布零速），
 下游流控制器的命令超时机制自然接管为"保持位置 + 提升阻尼"。
@@ -175,6 +176,9 @@ ros2 topic echo /rebot_teleop_joy/status      # 状态机与档位
 | `limit_margin_deg` | 5.0 | 软限位衰减余量 |
 | `xy_speed` / `z_speed` | 0.10 / 0.06 | 末端模式平移速度 (m/s，满档) |
 | `rotation_scale` | 1.0 | 手柄姿态→末端姿态（1:1） |
+| `ik_solver` | `placo` | `placo`（QP 硬约束）/ `dls`（无额外依赖）；PlaCo 缺失或初始化失败时自动回退 DLS |
+| `position_weight` / `orientation_weight` | 100 / 0.35 | 位置优先约 300:1，不可达时先牺牲姿态 |
+| `joint_margin` / `max_joint_speed` | 0.02 / 0.7 | IK 关节限位内收余量 (rad) / 独立于控制频率的速度限 (rad/s) |
 
 ---
 
@@ -184,8 +188,8 @@ ros2 topic echo /rebot_teleop_joy/status      # 状态机与档位
 |---|---|
 | **deadman 与离合合并** | ZR/ZL 一键兼任。按下=锚定、按住=跟踪、松开=冻结，天然满足 deadman 的"松手即停"安全语义；同时"松开-转手-再按下"就是一次重锚定，解决 IMU 遥操最大的痛点（手腕活动范围有限）。相比独立离合键，减少一个按键负担且消除了"离合按住但 deadman 松开"的歧义状态。 |
 | **yaw 漂移处理** | yaw 仅由陀螺积分、必然漂移，因此**只用于速度型控制**（joint 模式的 j1）或**水平方向基准**（cartesian 模式的 heading-relative 平移方向）——两者都不要求 yaw 的绝对精度：速度控制有 ±8° 死区吸收慢漂；方向基准每次锚定时重置。绝不把 yaw 用于 1:1 增量位置映射。 |
-| **末端模式：位姿流 vs twist** | **选位姿流（PoseStamped）**。姿态增量由"锚定姿态 × 手柄姿态增量"确定性合成，不受低通滤波和丢帧影响；twist 需要对角速度积分，滤波延迟与丢帧会累积成姿态漂移，且丢一帧就永久丢失一段位移。位姿流的代价是需要 IK 跟踪误差收敛，但由 servo 的 DLS 迭代天然处理。 |
-| **动力学/IK 库** | 用 PyKDL + urdf_parser_py 手工装链（Humble 二进制未提供 `kdl_parser_py`）。奇异度量用 **J 的 SVD 最小奇异值**，而非 `J·Jᵀ` 的最小特征值——后者在关节数 <6 时结构性为零，会导致降速永远触发。 |
+| **末端模式：位姿流 vs twist** | **选位姿流（PoseStamped）**。姿态增量由"锚定姿态 × 手柄姿态增量"确定性合成，不受低通滤波和丢帧影响；twist 需要对角速度积分，滤波延迟与丢帧会累积成姿态漂移，且丢一帧就永久丢失一段位移。位姿流的代价是需要 IK 跟踪误差收敛，由 servo 的增量 QP/DLS 迭代处理。 |
+| **IK 后端与调参** | 对齐 JoyReBot：默认 PlaCo QP，把关节限位和 0.7 rad/s 速度限作为硬约束，并在 native solver 输出后再设 trust boundary；位置/姿态权重 100/0.35，使不可达目标先牺牲姿态。PlaCo 不可用时自动回退加权 PyKDL DLS。DLS 奇异度量用 **J 的 SVD 最小奇异值**，而非 `J·Jᵀ` 的结构性零特征值。 |
 | **档位取值** | 增量档 0.5/1.0/1.5、速度档 0.3/0.6/1.0（相对满速）。默认低档起步，符合任务书"先低增益验证"的安全流程。**真机实测取值待补**。 |
 | **不使用 evdev/joy 包** | `hid_nintendo` 内核驱动把 IMU 暴露为独立 evdev 设备，需同时打开两个设备并自行解码；vendor 的 hidapi 直读方案单设备拿到按键+摇杆+IMU 且已含 Mahony 解算，复用 JoyReBot 的成熟实现更稳。代价是需要 udev 规则放开 hidraw 权限。 |
 
@@ -196,9 +200,9 @@ ros2 topic echo /rebot_teleop_joy/status      # 状态机与档位
 **mock 已验证**（无手柄环境）：
 
 - 伺服关节通道：`/servo/joint_command` → 限位钳位 → 流控制器 → 六关节到位
-- 伺服笛卡尔通道：命令 +5cm X 位移，IK 跟踪到位（误差 <0.1 mm，姿态保持）
+- 伺服笛卡尔通道：同一 +5 cm X 位移分别实跑 PlaCo 与 DLS；PlaCo 在回报精度内零误差，DLS 位置误差约 0.011 mm、姿态误差约 0.00074 rad
 - teleop 节点无手柄时优雅降级：记录 DISCONNECTED、不发布任何命令
-- 32 项单元测试：状态机 8 项、姿态门 4 项、关节映射 8 项、末端映射 6 项、运动学 5 项
+- 37 项单元测试（含 10 项双后端运动学/约束/自动回退测试）
 
 **未验证（需真实硬件）**：
 

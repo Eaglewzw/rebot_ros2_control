@@ -22,10 +22,13 @@ Interface (module-A compatible):
   out: ~/status              String       singularity / limit warnings
 
 The joint channel is a validated passthrough (clamped into the soft limits).
-The cartesian channel runs damped-least-squares differential IK with
-singularity slow-down (see kinematics.py); final velocity/acceleration
-smoothing is provided by the downstream TeleopStreamController.
+The cartesian channel defaults to constrained PlaCo QP IK and automatically
+falls back to weighted damped-least-squares IK when PlaCo is unavailable.
+Final velocity/acceleration smoothing is provided by the downstream
+TeleopStreamController.
 """
+
+import math
 
 import rclpy
 from rclpy.node import Node
@@ -37,7 +40,7 @@ from std_msgs.msg import Float64MultiArray, String
 
 import PyKDL
 
-from rebot_teleop_joy.kinematics import DifferentialIk
+from rebot_teleop_joy.kinematics import make_ik_solver
 
 ARM_JOINTS = ['joint1', 'joint2', 'joint3', 'joint4', 'joint5', 'joint6']
 
@@ -46,12 +49,34 @@ class ServoMinimalNode(Node):
 
     def __init__(self):
         super().__init__('servo_minimal')
-        rate = self.declare_parameter('rate', 50.0).value
+        rate = float(self.declare_parameter('rate', 50.0).value)
+        if not math.isfinite(rate) or rate <= 0.0:
+            raise ValueError('rate must be finite and positive')
+        self.control_period = 1.0 / rate
         self.base_link = self.declare_parameter('base_link', 'base_link').value
         self.tip_link = self.declare_parameter('tip_link', 'link6').value
         self.pose_timeout = self.declare_parameter('pose_timeout', 0.3).value
+        self.requested_ik_solver = self.declare_parameter(
+            'ik_solver', 'placo').value
+        self.ik_options = {
+            'max_joint_speed': float(self.declare_parameter(
+                'max_joint_speed', 0.7).value),
+            'joint_margin': float(self.declare_parameter(
+                'joint_margin', 0.02).value),
+            'position_weight': float(self.declare_parameter(
+                'position_weight', 100.0).value),
+            'orientation_weight': float(self.declare_parameter(
+                'orientation_weight', 0.35).value),
+            'position_tolerance': float(self.declare_parameter(
+                'position_tolerance', 0.004).value),
+            'orientation_tolerance': float(self.declare_parameter(
+                'orientation_tolerance', 0.015).value),
+            'solve_iterations': int(self.declare_parameter(
+                'placo_solve_iterations', 1).value),
+        }
 
         self.ik = None
+        self.actual_ik_solver = ''
         self.urdf = ''
         transient = QoSProfile(depth=1)
         transient.durability = DurabilityPolicy.TRANSIENT_LOCAL
@@ -74,16 +99,24 @@ class ServoMinimalNode(Node):
         self.target_time = None
         self.last_status = ''
 
-        self.create_timer(1.0 / float(rate), self._tick)
+        self.create_timer(self.control_period, self._tick)
 
     def _robot_description(self, msg):
         if self.ik is not None:
             return
         try:
-            self.ik = DifferentialIk(msg.data, self.base_link, self.tip_link)
+            ik, actual_ik_solver = make_ik_solver(
+                self.requested_ik_solver, msg.data, self.base_link, self.tip_link,
+                logger=self.get_logger().warning, **self.ik_options)
+            if ik.joint_names != ARM_JOINTS:
+                raise ValueError(
+                    f'servo chain joints {ik.joint_names} do not match '
+                    f'expected arm joints {ARM_JOINTS}')
+            self.ik = ik
+            self.actual_ik_solver = actual_ik_solver
             self.get_logger().info(
                 f'Servo chain ready: {self.base_link} -> {self.tip_link} '
-                f'({self.ik.n} joints)')
+                f'({self.ik.n} joints, IK={self.actual_ik_solver})')
         except Exception as error:  # noqa: BLE001
             self.get_logger().error(f'Cannot build the servo chain: {error}')
 
@@ -157,17 +190,28 @@ class ServoMinimalNode(Node):
         if self.q is None:
             self.q = list(self.measured)
         target_pos, target_rot = self.target
-        self.q, error = self.ik.step(self.q, target_pos, target_rot, 0.02)
+        self.q, diagnostics = self.ik.step(
+            self.q, target_pos, target_rot, self.control_period)
 
         out = Float64MultiArray()
         out.data = [float(v) for v in self.q]
         self.command_pub.publish(out)
 
-        if self.ik.singularity_scale < 1.0:
+        if diagnostics.failure:
+            self._status(f'IK_FAILURE: {diagnostics.failure}')
+        elif diagnostics.singularity_scale < 1.0:
             self._status(
-                f'SINGULARITY: slowing down (scale {self.ik.singularity_scale:.2f})')
-        elif error > 0.15:
-            self._status(f'TRACKING: pose error {error:.2f} (limits or reach)')
+                'SINGULARITY: slowing down '
+                f'(scale {diagnostics.singularity_scale:.2f})')
+        elif diagnostics.at_joint_limit:
+            self._status(
+                'JOINT_LIMIT: IK reached the configured safety margin')
+        elif diagnostics.position_error > 0.15:
+            self._status(
+                'TRACKING: position error '
+                f'{diagnostics.position_error:.3f} m (limits or reach)')
+        elif diagnostics.velocity_limited:
+            self._status('VELOCITY_LIMIT: IK step limited to max_joint_speed')
         else:
             self._status('')
 
