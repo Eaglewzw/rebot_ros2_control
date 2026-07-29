@@ -1,0 +1,45 @@
+# Parameters for the Joy-Con teleop node (both modes).
+# NOTE: stick centers/ranges and axis signs MUST be re-verified with your own
+# Joy-Con (they drift between units and kernel/driver versions) — see README.
+rebot_teleop_joy:
+  ros__parameters:
+    # 'joint' or 'cartesian'; fixed at launch, no runtime switching.
+    teleop_mode: joint
+    rate: 50.0
+    input_timeout: 0.5          # s without a new HID report -> disconnected
+
+    # Attitude gate
+    attitude_cutoff_hz: 10.0    # low-pass against hand tremor
+    attitude_max_rate: 25.0     # rad/s; above -> spike, freeze one cycle
+    attitude_spike_limit: 5     # consecutive spikes -> force deadman release
+
+    # Stick normalization (12-bit raw counts)
+    stick_center: 2048.0
+    stick_half_range: 1400.0
+    stick_horizontal_sign: 1.0
+    stick_vertical_sign: 1.0
+
+    # Speed gears (low/mid/high), cycled with B (Down). Applies to the
+    # incremental 1:1 mappings and the velocity-type commands together.
+    gear_incremental_scales: [0.5, 1.0, 1.5]
+    gear_velocity_scales: [0.3, 0.6, 1.0]
+
+    # joint mode
+    roll_scale: 1.0             # handle roll -> joint6 increment scale
+    pitch_scale: 1.0            # handle pitch -> joint4 increment scale
+    yaw_deadband_deg: 8.0
+    yaw_saturation_deg: 45.0
+    yaw_max_velocity: 0.8       # rad/s at saturation, gear = 1
+    limit_margin_deg: 5.0       # soft-limit approach decay margin
+
+    # cartesian mode
+    xy_speed: 0.10              # m/s at full stick, gear = 1
+    z_speed: 0.06               # m/s (R up / stick-press down)
+    rotation_scale: 1.0         # handle attitude -> EE attitude (1:1)
+
+servo_minimal:
+  ros__parameters:
+    rate: 50.0
+    base_link: base_link
+    tip_link: link6
+    pose_timeout: 0.3
