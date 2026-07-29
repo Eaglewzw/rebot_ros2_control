@@ -34,17 +34,20 @@ endforeach()
 
 # ---------------------------------------------------------------------------
 # Parameter libraries (generate_parameter_library)
+# NOTE: the yaml files under params/ are code-generation inputs (compiled
+# into *_parameters.hpp), NOT runtime configuration — runtime values live in
+# rebot_bringup/config/ros2_control_controllers.yaml.
 # ---------------------------------------------------------------------------
 generate_parameter_library(mit_joint_controller_parameters
-  src/mit_joint_controller_parameters.yaml)
+  params/mit_joint_controller_parameters.yaml)
 generate_parameter_library(gravity_compensation_controller_parameters
-  src/gravity_compensation_controller_parameters.yaml)
+  params/gravity_compensation_controller_parameters.yaml)
 generate_parameter_library(mit_trajectory_controller_parameters
-  src/mit_trajectory_controller_parameters.yaml)
+  params/mit_trajectory_controller_parameters.yaml)
 generate_parameter_library(joint_impedance_controller_parameters
-  src/joint_impedance_controller_parameters.yaml)
+  params/joint_impedance_controller_parameters.yaml)
 generate_parameter_library(teleop_stream_controller_parameters
-  src/teleop_stream_controller_parameters.yaml)
+  params/teleop_stream_controller_parameters.yaml)
 
 # ---------------------------------------------------------------------------
 # Controller library
