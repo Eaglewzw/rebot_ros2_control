@@ -1,0 +1,29 @@
+<?xml version="1.0"?>
+<!--
+  Top-level description for the reBot Arm B601-DM with ros2_control.
+
+  Args:
+    use_mock_hardware  true (default): simulate with mock_components
+                       false: drive the real arm through rebot_hardware
+    serial_port        Damiao USB-CAN bridge device (real hardware only)
+
+  Example:
+    xacro rebot_b601_dm.urdf.xacro use_mock_hardware:=false serial_port:=/dev/ttyACM0
+-->
+<robot xmlns:xacro="http://www.ros.org/wiki/xacro" name="rebot_b601_dm">
+
+  <xacro:arg name="use_mock_hardware" default="true"/>
+  <xacro:arg name="serial_port" default="/dev/ttyACM0"/>
+
+  <!-- Official DM mechanical model (links, joints, meshes), adapted from
+       Seeed-Projects/reBotArmController_ROS2 reBot_B601_DM_with_gripper.urdf -->
+  <xacro:include filename="$(find rebot_description)/urdf/rebot_b601_dm.urdf"/>
+
+  <!-- ros2_control system -->
+  <xacro:include filename="$(find rebot_description)/urdf/rebot_b601_dm.ros2_control.xacro"/>
+  <xacro:rebot_b601_dm_ros2_control
+    name="ReBotB601DM"
+    use_mock_hardware="$(arg use_mock_hardware)"
+    serial_port="$(arg serial_port)"/>
+
+</robot>

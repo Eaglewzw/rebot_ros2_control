@@ -1,0 +1,106 @@
+<?xml version="1.0"?>
+<!--
+  ros2_control description for the reBot Arm B601-DM (Damiao motor version).
+
+  use_mock_hardware=true  -> mock_components/GenericSystem (no hardware)
+  use_mock_hardware=false -> rebot_hardware/ReBotSystemHardware (USB-CAN bridge)
+
+  Joint-to-motor mapping, kp/kd defaults and limit conventions come from the
+  official reBot SDK config (reBotArm_control_py/config/rebotarm_dm.yaml),
+  see docs/damiao_protocol_notes.md.
+-->
+<robot xmlns:xacro="http://www.ros.org/wiki/xacro">
+
+  <!-- One joint entry: interfaces + Damiao motor parameters.
+       reduction/offset: motor_position = joint_position * reduction + offset.
+       kp/kd are the MIT-mode gains sent with every command frame. -->
+  <xacro:macro name="rebot_joint"
+               params="name motor_id motor_model kp kd pos_min pos_max mock reduction:=1.0 offset:=0.0">
+    <joint name="${name}">
+      <!-- Full Damiao MIT command tuple. NaN = "not set": position holds the
+           measured value, velocity/effort fall back to 0, kp/kd to the
+           defaults below (see rebot_system.hpp). -->
+      <command_interface name="position">
+        <param name="min">${pos_min}</param>
+        <param name="max">${pos_max}</param>
+      </command_interface>
+      <command_interface name="velocity"/>
+      <command_interface name="kp"/>
+      <command_interface name="kd"/>
+      <command_interface name="effort"/>
+      <state_interface name="position"/>
+      <state_interface name="velocity"/>
+      <state_interface name="effort"/>
+      <xacro:unless value="${mock}">
+        <param name="motor_id">${motor_id}</param>
+        <param name="motor_model">${motor_model}</param>
+        <param name="kp">${kp}</param>
+        <param name="kd">${kd}</param>
+        <param name="mechanical_reduction">${reduction}</param>
+        <param name="position_offset">${offset}</param>
+      </xacro:unless>
+    </joint>
+  </xacro:macro>
+
+  <xacro:macro name="rebot_b601_dm_ros2_control"
+               params="name use_mock_hardware serial_port:=/dev/ttyACM0 baud_rate:=921600">
+    <ros2_control name="${name}" type="system">
+      <hardware>
+        <xacro:if value="${use_mock_hardware}">
+          <plugin>mock_components/GenericSystem</plugin>
+          <!-- Must stay false: with dynamics on, Humble's GenericSystem
+               rejects claiming position AND velocity of one joint
+               ("multiple starting interfaces"), which the MIT-tuple
+               controllers do. Mock velocity states are therefore 0. -->
+          <param name="calculate_dynamics">false</param>
+        </xacro:if>
+        <xacro:unless value="${use_mock_hardware}">
+          <plugin>rebot_hardware/ReBotSystemHardware</plugin>
+          <param name="serial_port">${serial_port}</param>
+          <param name="baud_rate">${baud_rate}</param>
+          <!-- read() returns ERROR after this many cycles without motor
+               feedback (safe stop via on_error). -->
+          <param name="comm_error_threshold">10</param>
+          <param name="activate_timeout_ms">100</param>
+          <param name="enable_retries">5</param>
+        </xacro:unless>
+      </hardware>
+
+      <!-- Damiao convention: feedback (Master) ID = motor CAN ID + 0x10,
+           which is the plugin default, so it is not repeated here. -->
+
+      <!-- Parallel gripper: gripper_joint1 (left finger, 0..0.0715 m) is
+           driven by motor 0x07 through a rack-and-pinion; gripper_joint2
+           mimics it in the URDF. Official SDK: motor angle -5.0 rad = open,
+           0.0 rad = closed -> reduction = -5.0 / 0.0715 = -69.93 rad/m.
+           NOTE: listed before joint1 on purpose. Humble's
+           mock_components/GenericSystem matches interface names by substring
+           in prepare_command_mode_switch(), so "gripper_joint1/position"
+           would otherwise be mis-attributed to "joint1" and the gripper
+           controller would fail to activate in mock mode. -->
+      <xacro:rebot_joint name="gripper_joint1" motor_id="7" motor_model="4310"
+                         kp="8.0" kd="1.0" pos_min="0.0" pos_max="0.0715"
+                         reduction="-69.93" mock="${use_mock_hardware}"/>
+
+      <xacro:rebot_joint name="joint1" motor_id="1" motor_model="4340P"
+                         kp="120.0" kd="5.0" pos_min="-2.8" pos_max="2.8"
+                         mock="${use_mock_hardware}"/>
+      <xacro:rebot_joint name="joint2" motor_id="2" motor_model="4340P"
+                         kp="120.0" kd="5.0" pos_min="-3.14" pos_max="0.0"
+                         mock="${use_mock_hardware}"/>
+      <xacro:rebot_joint name="joint3" motor_id="3" motor_model="4340P"
+                         kp="120.0" kd="5.0" pos_min="-3.14" pos_max="0.0"
+                         mock="${use_mock_hardware}"/>
+      <xacro:rebot_joint name="joint4" motor_id="4" motor_model="4310"
+                         kp="18.0" kd="2.0" pos_min="-1.87" pos_max="1.57"
+                         mock="${use_mock_hardware}"/>
+      <xacro:rebot_joint name="joint5" motor_id="5" motor_model="4310"
+                         kp="18.0" kd="2.0" pos_min="-1.57" pos_max="1.57"
+                         mock="${use_mock_hardware}"/>
+      <xacro:rebot_joint name="joint6" motor_id="6" motor_model="4310"
+                         kp="18.0" kd="2.0" pos_min="-3.14" pos_max="3.14"
+                         mock="${use_mock_hardware}"/>
+    </ros2_control>
+  </xacro:macro>
+
+</robot>
