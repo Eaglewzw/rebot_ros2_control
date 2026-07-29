@@ -2,7 +2,10 @@
 <package format="3">
   <name>rebot_hardware</name>
   <version>0.1.0</version>
-  <description>ros2_control hardware interface implementation for the reBot robotic arm.</description>
+  <description>
+    ros2_control hardware interface for the Seeed reBot Arm B601-DM
+    (Damiao DM-J4310 / DM-J4340P motors via USB-CAN serial bridge).
+  </description>
 
   <maintainer email="1460853569@qq.com">Eaglewzw</maintainer>
   <license>Apache-2.0</license>
@@ -13,19 +16,10 @@
   <depend>pluginlib</depend>
   <depend>rclcpp</depend>
   <depend>rclcpp_lifecycle</depend>
-  <depend>realtime_tools</depend>
-  <depend>std_msgs</depend>
-  <depend>sensor_msgs</depend>
-  <depend>joint_limits</depend>
-  <depend>control_msgs</depend>
 
-  <test_depend>ament_lint_auto</test_depend>
-  <test_depend>ament_lint_common</test_depend>
+  <test_depend>ament_cmake_gtest</test_depend>
 
   <export>
     <build_type>ament_cmake</build_type>
-    <!-- Pluginlib: export the hardware interface class so the
-         controller_manager can discover and load it. -->
-    <hardware_interface plugin="${prefix}/config/rebot_hardware_plugin.xml" />
   </export>
 </package>
