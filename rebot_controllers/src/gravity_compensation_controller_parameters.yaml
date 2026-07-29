@@ -1,0 +1,37 @@
+gravity_compensation_controller:
+  joints:
+    type: string_array
+    default_value: []
+    description: "Joints controlled. Joints outside the KDL chain get zero gravity torque."
+  rated_torques:
+    type: double_array
+    default_value: []
+    description: "Rated torque per joint [N*m] (DM-J4340P: 9, DM-J4310: 3). Same length as joints."
+  torque_limit_ratio:
+    type: double
+    default_value: 0.5
+    description: "Per-joint clamp: |tau_i| <= ratio * rated_torques[i]."
+  gravity_scale:
+    type: double
+    default_value: 1.0
+    description: "Overall scaling of g(q). Ramp up from ~0.3 during first hardware tests."
+  kd_damping:
+    type: double
+    default_value: 0.2
+    description: "Small MIT kd sent to every motor to damp drift (kp is 0)."
+  base_link:
+    type: string
+    default_value: "base_link"
+    description: "Root of the KDL chain."
+  tip_link:
+    type: string
+    default_value: "link6"
+    description: "Tip of the KDL chain."
+  robot_description:
+    type: string
+    default_value: ""
+    description: "URDF string; when empty it is fetched from the /robot_description topic."
+  robot_description_timeout:
+    type: double
+    default_value: 5.0
+    description: "Seconds to wait for /robot_description."

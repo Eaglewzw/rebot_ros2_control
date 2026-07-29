@@ -1,0 +1,53 @@
+mit_trajectory_controller:
+  joints:
+    type: string_array
+    default_value: []
+    description: "Joints controlled, in trajectory order."
+  kp:
+    type: double_array
+    default_value: []
+    description: "MIT kp per joint [0, 500]. Runtime tunable."
+  kd:
+    type: double_array
+    default_value: []
+    description: "MIT kd per joint [0, 5]. Runtime tunable."
+  use_gravity_ff:
+    type: bool
+    default_value: true
+    description: "Add g(q) as feed-forward torque."
+  rated_torques:
+    type: double_array
+    default_value: []
+    description: "Rated torque per joint [N*m], clamps the feed-forward. Same length as joints."
+  torque_limit_ratio:
+    type: double
+    default_value: 0.5
+    description: "Feed-forward clamp: |tau_i| <= ratio * rated_torques[i]."
+  path_tolerance:
+    type: double_array
+    default_value: []
+    description: "Per-joint |q - q_ref| limit during execution [rad]; empty disables, 0 disables per joint."
+  goal_tolerance:
+    type: double_array
+    default_value: []
+    description: "Per-joint |q - q_goal| limit at the end [rad]; empty disables, 0 disables per joint."
+  goal_time_tolerance:
+    type: double
+    default_value: 0.5
+    description: "Extra seconds after the trajectory end to reach the goal tolerance. 0 = unlimited."
+  base_link:
+    type: string
+    default_value: "base_link"
+    description: "Root of the KDL chain (gravity feed-forward)."
+  tip_link:
+    type: string
+    default_value: "link6"
+    description: "Tip of the KDL chain (gravity feed-forward)."
+  robot_description:
+    type: string
+    default_value: ""
+    description: "URDF string; when empty it is fetched from the /robot_description topic."
+  robot_description_timeout:
+    type: double
+    default_value: 5.0
+    description: "Seconds to wait for /robot_description."

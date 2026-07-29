@@ -1,0 +1,47 @@
+joint_impedance_controller:
+  joints:
+    type: string_array
+    default_value: []
+    description: "Joints controlled."
+  mode:
+    type: string
+    default_value: "onboard"
+    description: >
+      onboard: stiffness/damping run in the motor MIT loop (recommended).
+      software: impedance law is closed in update() with motor gains zero.
+  stiffness:
+    type: double_array
+    default_value: []
+    description: "K per joint [N*m/rad]. In onboard mode this is the MIT kp, range [0, 500]."
+  damping:
+    type: double_array
+    default_value: []
+    description: "D per joint [N*m*s/rad]. In onboard mode this is the MIT kd, range [0, 5]."
+  use_gravity_ff:
+    type: bool
+    default_value: true
+    description: "Add g(q) as feed-forward torque."
+  rated_torques:
+    type: double_array
+    default_value: []
+    description: "Rated torque per joint [N*m]; clamps the total commanded effort."
+  torque_limit_ratio:
+    type: double
+    default_value: 0.5
+    description: "Effort clamp: |tau_i| <= ratio * rated_torques[i]."
+  base_link:
+    type: string
+    default_value: "base_link"
+    description: "Root of the KDL chain."
+  tip_link:
+    type: string
+    default_value: "link6"
+    description: "Tip of the KDL chain."
+  robot_description:
+    type: string
+    default_value: ""
+    description: "URDF string; when empty it is fetched from the /robot_description topic."
+  robot_description_timeout:
+    type: double
+    default_value: 5.0
+    description: "Seconds to wait for /robot_description."

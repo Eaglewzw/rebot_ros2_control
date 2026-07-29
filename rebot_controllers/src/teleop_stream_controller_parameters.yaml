@@ -1,0 +1,29 @@
+teleop_stream_controller:
+  joints:
+    type: string_array
+    default_value: []
+    description: "Joints controlled; ~/commands data order must match."
+  kp:
+    type: double_array
+    default_value: []
+    description: "MIT kp per joint [0, 500]."
+  kd:
+    type: double_array
+    default_value: []
+    description: "MIT kd per joint [0, 5]."
+  max_velocity:
+    type: double_array
+    default_value: []
+    description: "Smoothing velocity limit per joint [rad/s]."
+  max_acceleration:
+    type: double_array
+    default_value: []
+    description: "Smoothing acceleration limit per joint [rad/s^2]."
+  command_timeout:
+    type: double
+    default_value: 0.25
+    description: "Seconds without a command before entering the hold state."
+  timeout_kd_scale:
+    type: double
+    default_value: 2.0
+    description: "kd multiplier while in the timeout hold state (clamped to 5)."

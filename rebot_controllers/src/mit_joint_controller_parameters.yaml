@@ -1,0 +1,11 @@
+mit_joint_controller:
+  joints:
+    type: string_array
+    default_value: []
+    description: "Joints controlled (must match the hardware joint names)."
+  command_timeout:
+    type: double
+    default_value: 0.0
+    description: >
+      Seconds after which a stale command is dropped and the arm falls back
+      to holding position with default gains. 0 disables the timeout.

@@ -1,0 +1,42 @@
+<library path="rebot_controllers">
+  <class name="rebot_controllers/MitJointController"
+         type="rebot_controllers::MitJointController"
+         base_class_type="controller_interface::ControllerInterface">
+    <description>
+      Damiao MIT-mode passthrough: forwards position/velocity/kp/kd/effort
+      tuples from a rebot_msgs/MitJointCommand topic to the hardware.
+    </description>
+  </class>
+  <class name="rebot_controllers/GravityCompensationController"
+         type="rebot_controllers::GravityCompensationController"
+         base_class_type="controller_interface::ControllerInterface">
+    <description>
+      Zero-gravity hand-guiding mode: kp=0, small kd, effort = clamped g(q)
+      computed from the URDF (KDL).
+    </description>
+  </class>
+  <class name="rebot_controllers/MitTrajectoryController"
+         type="rebot_controllers::MitTrajectoryController"
+         base_class_type="controller_interface::ControllerInterface">
+    <description>
+      FollowJointTrajectory action controller in MIT mode with gravity
+      feed-forward and JTC-style tolerances.
+    </description>
+  </class>
+  <class name="rebot_controllers/JointImpedanceController"
+         type="rebot_controllers::JointImpedanceController"
+         base_class_type="controller_interface::ChainableControllerInterface">
+    <description>
+      Chainable joint impedance controller (onboard MIT loop or software
+      torque loop) with gravity feed-forward.
+    </description>
+  </class>
+  <class name="rebot_controllers/TeleopStreamController"
+         type="rebot_controllers::TeleopStreamController"
+         base_class_type="controller_interface::ControllerInterface">
+    <description>
+      Streaming teleoperation with velocity/acceleration smoothing and
+      command-timeout hold protection.
+    </description>
+  </class>
+</library>
