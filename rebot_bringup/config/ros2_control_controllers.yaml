@@ -1,10 +1,26 @@
 # ==============================================================================
-# reBot ros2_control controllers config (Mock mode)
+# reBot B601-DM ros2_control controllers (shared by mock and real hardware)
 #
-# - controller_manager.ros__parameters      → type for each controller
-# - <controller_name>.ros__parameters       → runtime params for each controller
+# The hardware exports per joint (Damiao MIT tuple):
+#   command: position / velocity / kp / kd / effort
+#   state:   position / velocity / effort
 #
-# Both sections MUST have ros__parameters for the ROS2 param-file parser.
+# Interface claims & mutual exclusion:
+#   - joint_state_broadcaster            claims nothing        (always on)
+#   - gripper_controller                 gripper_joint1 only   (always on)
+#   - ARM controllers all claim the full MIT tuple of joint1..joint6 and are
+#     therefore MUTUALLY EXCLUSIVE — exactly one may be active at a time:
+#       joint_trajectory_controller      (position only, official)
+#       mit_joint_controller             (five-tuple passthrough)
+#       gravity_compensation_controller  (zero-g hand guiding)
+#       mit_trajectory_controller        (MIT trajectory + gravity ff)
+#       joint_impedance_controller       (impedance, chainable)
+#       teleop_stream_controller         (smoothed teleop stream)
+#   Switch with:
+#     ros2 control switch_controllers \
+#       --deactivate <active> --activate <next>
+#   Switching is torque-jump free: every controller restores the NaN
+#   sentinel ("hold position, default gains") on deactivation.
 # ==============================================================================
 
 controller_manager:
@@ -18,7 +34,22 @@ controller_manager:
       type: joint_trajectory_controller/JointTrajectoryController
 
     gripper_controller:
-      type: position_controllers/JointGroupPositionController
+      type: position_controllers/GripperActionController
+
+    mit_joint_controller:
+      type: rebot_controllers/MitJointController
+
+    gravity_compensation_controller:
+      type: rebot_controllers/GravityCompensationController
+
+    mit_trajectory_controller:
+      type: rebot_controllers/MitTrajectoryController
+
+    joint_impedance_controller:
+      type: rebot_controllers/JointImpedanceController
+
+    teleop_stream_controller:
+      type: rebot_controllers/TeleopStreamController
 
 # ==============================================================================
 
@@ -39,36 +70,97 @@ joint_trajectory_controller:
       - joint5
       - joint6
 
+    # Real hardware only accepts position commands (MIT mode handles the
+    # velocity loop internally with the per-joint kp/kd from the URDF).
     command_interfaces:
       - position
-      - velocity
 
     state_interfaces:
       - position
       - velocity
 
-    state_publish_rate:   50.0
-    action_monitor_rate:  20.0
+    state_publish_rate: 50.0
+    action_monitor_rate: 20.0
 
     allow_partial_joints_goal: false
     open_loop_control: false
     allow_nonzero_velocity_at_trajectory_end: false
 
     constraints:
-      stopped_velocity_tolerance: 0.01
+      stopped_velocity_tolerance: 0.05
       goal_time: 0.0
 
-    gains:
-      joint1: { p: 100.0,  i: 0.0,  d: 5.0,   i_clamp: 10.0,  ff_velocity: 1.0 }
-      joint2: { p: 200.0,  i: 0.0,  d: 10.0,  i_clamp: 10.0,  ff_velocity: 1.0 }
-      joint3: { p: 150.0,  i: 0.0,  d: 8.0,   i_clamp: 10.0,  ff_velocity: 1.0 }
-      joint4: { p: 100.0,  i: 0.0,  d: 5.0,   i_clamp: 5.0,   ff_velocity: 1.0 }
-      joint5: { p: 80.0,   i: 0.0,  d: 4.0,   i_clamp: 5.0,   ff_velocity: 1.0 }
-      joint6: { p: 80.0,   i: 0.0,  d: 4.0,   i_clamp: 5.0,   ff_velocity: 1.0 }
-
+# ==============================================================================
+# Parallel gripper: GripperCommand action on
+# /gripper_controller/gripper_cmd (position in metres, 0.0 closed, 0.0715 open;
+# gripper_joint2 mimics gripper_joint1 in the URDF)
 # ==============================================================================
 
 gripper_controller:
   ros__parameters:
-    joints:
-      - gripper_joint
+    joint: gripper_joint1
+    action_monitor_rate: 20.0
+    goal_tolerance: 0.005
+    allow_stalling: true
+    stall_velocity_threshold: 0.001
+    stall_timeout: 1.0
+
+# ==============================================================================
+# Custom MIT-mode controllers (rebot_controllers). Loaded inactive by the
+# bringup launch; activate exactly one arm controller at a time.
+# rated_torques: DM-J4340P = 9 N*m (joint1-3), DM-J4310 = 3 N*m (joint4-6).
+# ==============================================================================
+
+mit_joint_controller:
+  ros__parameters:
+    joints: [joint1, joint2, joint3, joint4, joint5, joint6]
+    command_timeout: 0.5
+
+gravity_compensation_controller:
+  ros__parameters:
+    joints: [joint1, joint2, joint3, joint4, joint5, joint6]
+    rated_torques: [9.0, 9.0, 9.0, 3.0, 3.0, 3.0]
+    torque_limit_ratio: 0.5
+    # First hardware runs: start at 0.3 and ramp up (see README).
+    gravity_scale: 1.0
+    kd_damping: 0.2
+    base_link: base_link
+    tip_link: link6
+
+mit_trajectory_controller:
+  ros__parameters:
+    joints: [joint1, joint2, joint3, joint4, joint5, joint6]
+    kp: [120.0, 120.0, 120.0, 18.0, 18.0, 18.0]
+    kd: [5.0, 5.0, 5.0, 2.0, 2.0, 2.0]
+    use_gravity_ff: true
+    rated_torques: [9.0, 9.0, 9.0, 3.0, 3.0, 3.0]
+    torque_limit_ratio: 0.5
+    path_tolerance: [0.5, 0.5, 0.5, 0.5, 0.5, 0.5]
+    goal_tolerance: [0.05, 0.05, 0.05, 0.05, 0.05, 0.05]
+    goal_time_tolerance: 0.5
+    base_link: base_link
+    tip_link: link6
+
+joint_impedance_controller:
+  ros__parameters:
+    joints: [joint1, joint2, joint3, joint4, joint5, joint6]
+    # onboard: gains run in the motor MIT loop (kp<=500, kd<=5).
+    # software: torque loop closed at the update rate (gains unlimited).
+    mode: onboard
+    stiffness: [60.0, 60.0, 60.0, 12.0, 12.0, 12.0]
+    damping: [2.0, 2.0, 2.0, 1.0, 1.0, 1.0]
+    use_gravity_ff: true
+    rated_torques: [9.0, 9.0, 9.0, 3.0, 3.0, 3.0]
+    torque_limit_ratio: 0.5
+    base_link: base_link
+    tip_link: link6
+
+teleop_stream_controller:
+  ros__parameters:
+    joints: [joint1, joint2, joint3, joint4, joint5, joint6]
+    kp: [120.0, 120.0, 120.0, 18.0, 18.0, 18.0]
+    kd: [2.0, 2.0, 2.0, 1.0, 1.0, 1.0]
+    max_velocity: [2.0, 2.0, 2.0, 3.0, 3.0, 3.0]
+    max_acceleration: [8.0, 8.0, 8.0, 12.0, 12.0, 12.0]
+    command_timeout: 0.25
+    timeout_kd_scale: 2.0

@@ -18,10 +18,10 @@
   <depend>joint_state_publisher_gui</depend>
   <depend>rviz2</depend>
   <depend>ros2launch</depend>
-
-  <!-- Optional: only needed for simulation -->
-  <exec_depend>ros_gz_sim</exec_depend>
-  <exec_depend>ros_gz_bridge</exec_depend>
+  <exec_depend>xacro</exec_depend>
+  <exec_depend>joint_state_broadcaster</exec_depend>
+  <exec_depend>joint_trajectory_controller</exec_depend>
+  <exec_depend>gripper_controllers</exec_depend>
 
   <test_depend>ament_lint_auto</test_depend>
   <test_depend>ament_lint_common</test_depend>

@@ -1,12 +1,15 @@
 #!/usr/bin/env python3
 # ==============================================================================
-# reBot Mock-mode bringup
+# reBot B601-DM bringup (mock or real hardware)
 #
-# Launches the full ros2_control pipeline with a virtual hardware interface,
-# joint state broadcasting, trajectory controller, and RViz visualisation.
+# Launches the full ros2_control pipeline: controller_manager with the
+# rebot hardware plugin (or mock components), joint state broadcasting,
+# trajectory + gripper controllers, and RViz visualisation.
 #
 # Usage:
-#   ros2 launch rebot_bringup bringup.launch.py
+#   Mock (default):  ros2 launch rebot_bringup bringup.launch.py
+#   Real hardware:   ros2 launch rebot_bringup bringup.launch.py \
+#                        use_mock_hardware:=false serial_port:=/dev/ttyACM0
 # ==============================================================================
 
 from launch import LaunchDescription
@@ -27,36 +30,59 @@ from launch_ros.substitutions import FindPackageShare
 def generate_launch_description():
 
     # ---- Launch arguments ----
-    use_rviz = LaunchConfiguration("use_rviz", default="true")
+    use_rviz = LaunchConfiguration("use_rviz")
+    use_mock_hardware = LaunchConfiguration("use_mock_hardware")
+    serial_port = LaunchConfiguration("serial_port")
 
-    declare_use_rviz = DeclareLaunchArgument(
-        "use_rviz",
-        default_value="true",
-        description="Launch RViz2 for visualisation",
-    )
+    declared_arguments = [
+        DeclareLaunchArgument(
+            "use_rviz",
+            default_value="true",
+            description="Launch RViz2 for visualisation",
+        ),
+        DeclareLaunchArgument(
+            "use_mock_hardware",
+            default_value="true",
+            description="true: mock_components simulation; "
+            "false: real arm via Damiao USB-CAN bridge",
+        ),
+        DeclareLaunchArgument(
+            "serial_port",
+            default_value="/dev/ttyACM0",
+            description="Damiao USB-CAN serial bridge device (real hardware only)",
+        ),
+    ]
 
     # ---- Package paths ----
     pkg_bringup = FindPackageShare("rebot_bringup")
     pkg_description = FindPackageShare("rebot_description")
 
-    urdf_path = PathJoinSubstitution([pkg_description, "urdf", "rebot_b601_rs.urdf"])
-    rviz_config_path = PathJoinSubstitution(
-        [pkg_description, "rviz", "rebot.rviz"]
+    xacro_path = PathJoinSubstitution(
+        [pkg_description, "urdf", "rebot_b601_dm.urdf.xacro"]
     )
+    rviz_config_path = PathJoinSubstitution([pkg_description, "rviz", "rebot.rviz"])
     controllers_path = PathJoinSubstitution(
         [pkg_bringup, "config", "ros2_control_controllers.yaml"]
     )
 
-    # ---- Robot description (plain URDF, xacro passthrough-safe) ----
-    robot_description_content = Command([FindExecutable(name="xacro"), " ", urdf_path])
+    # ---- Robot description ----
+    robot_description_content = Command(
+        [
+            FindExecutable(name="xacro"),
+            " ",
+            xacro_path,
+            " use_mock_hardware:=",
+            use_mock_hardware,
+            " serial_port:=",
+            serial_port,
+        ]
+    )
     robot_description_param = {
         "robot_description": ParameterValue(robot_description_content, value_type=str)
     }
 
     # ==========================================================================
     # 1. ros2_control_node
-    #    - robot_description passed via remap (matching official demo pattern)
-    #    - controllers YAML passed as parameter file
     # ==========================================================================
     controller_manager_node = Node(
         package="controller_manager",
@@ -69,8 +95,7 @@ def generate_launch_description():
     )
 
     # ==========================================================================
-    # 2. robot_state_publisher — publishes URDF to /robot_description topic,
-    #    then publishes TF tree from /joint_states
+    # 2. robot_state_publisher
     # ==========================================================================
     robot_state_publisher_node = Node(
         package="robot_state_publisher",
@@ -82,7 +107,6 @@ def generate_launch_description():
     # ==========================================================================
     # 3. Controller spawners
     # ==========================================================================
-
     joint_state_spawner = Node(
         package="controller_manager",
         executable="spawner",
@@ -104,33 +128,45 @@ def generate_launch_description():
         output="both",
     )
 
+    # Custom MIT-mode controllers, loaded inactive. Activate exactly one arm
+    # controller at a time, e.g.:
+    #   ros2 control switch_controllers \
+    #       --deactivate joint_trajectory_controller \
+    #       --activate gravity_compensation_controller
+    custom_controllers_spawner = Node(
+        package="controller_manager",
+        executable="spawner",
+        arguments=[
+            "mit_joint_controller",
+            "gravity_compensation_controller",
+            "mit_trajectory_controller",
+            "joint_impedance_controller",
+            "teleop_stream_controller",
+            "--inactive",
+        ],
+        output="both",
+    )
+
     # ==========================================================================
     # 4. RViz2
     # ==========================================================================
     rviz_node = Node(
         package="rviz2",
         executable="rviz2",
-        arguments=[
-            "-d",
-            rviz_config_path,
-            "-f",
-            "world",
-        ],
+        arguments=["-d", rviz_config_path, "-f", "world"],
         condition=IfCondition(use_rviz),
         output="both",
     )
 
-    # ==========================================================================
-    # Assembly
-    # ==========================================================================
     return LaunchDescription(
-        [
-            declare_use_rviz,
+        declared_arguments
+        + [
             controller_manager_node,
             robot_state_publisher_node,
             joint_state_spawner,
             joint_trajectory_spawner,
             gripper_spawner,
+            custom_controllers_spawner,
             rviz_node,
         ]
     )
