@@ -92,13 +92,13 @@
                          kp="120.0" kd="5.0" pos_min="-3.14" pos_max="0.0"
                          mock="${use_mock_hardware}"/>
       <xacro:rebot_joint name="joint4" motor_id="4" motor_model="4310"
-                         kp="18.0" kd="2.0" pos_min="-1.87" pos_max="1.57"
+                         kp="18.0" kd="5.0" pos_min="-1.87" pos_max="1.57"
                          mock="${use_mock_hardware}"/>
       <xacro:rebot_joint name="joint5" motor_id="5" motor_model="4310"
-                         kp="18.0" kd="2.0" pos_min="-1.57" pos_max="1.57"
+                         kp="18.0" kd="3.0" pos_min="-1.57" pos_max="1.57"
                          mock="${use_mock_hardware}"/>
       <xacro:rebot_joint name="joint6" motor_id="6" motor_model="4310"
-                         kp="18.0" kd="2.0" pos_min="-3.14" pos_max="3.14"
+                         kp="18.0" kd="3.0" pos_min="-3.14" pos_max="3.14"
                          mock="${use_mock_hardware}"/>
     </ros2_control>
   </xacro:macro>

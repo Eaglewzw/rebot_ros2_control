@@ -251,6 +251,31 @@ hardware_interface::CallbackReturn ReBotSystemHardware::on_activate(
     hw_commands_kd_[i] = std::numeric_limits<double>::quiet_NaN();
     hw_commands_effort_[i] = std::numeric_limits<double>::quiet_NaN();
 
+    // Set MIT control mode BEFORE enabling. The motor will ignore MIT frames
+    // unless RID_CTRL_MODE (register 10) is explicitly set to MODE_MIT (1).
+    if (!bridge_->send(
+        damiao::make_parameter_write_frame(cfg.motor_id, damiao::kRidCtrlMode, damiao::kModeMit)))
+    {
+      RCLCPP_ERROR(
+        logger_, "Joint '%s': failed to write MIT control mode.", info_.joints[i].name.c_str());
+      disable_all_motors();
+      return hardware_interface::CallbackReturn::ERROR;
+    }
+    bridge_->receive_for(rx, kMaxRxFramesPerCycle, activate_timeout_ms_);
+
+    // Configure CAN communication timeout (RID_TIMEOUT = 9, 500 ms). If the
+    // motor receives no valid CAN frame for this period (e.g. USB cable
+    // unplugged, serial bridge crash), it auto-disables as a safety fallback.
+    if (!bridge_->send(
+        damiao::make_parameter_write_frame(cfg.motor_id, damiao::kRidTimeout, damiao::kDefaultCanTimeout)))
+    {
+      RCLCPP_ERROR(
+        logger_, "Joint '%s': failed to set CAN timeout.", info_.joints[i].name.c_str());
+      disable_all_motors();
+      return hardware_interface::CallbackReturn::ERROR;
+    }
+    bridge_->receive_for(rx, kMaxRxFramesPerCycle, activate_timeout_ms_);
+
     if (!bridge_->send(damiao::make_enable_frame(cfg.motor_id))) {
       disable_all_motors();
       return hardware_interface::CallbackReturn::ERROR;

@@ -66,10 +66,25 @@ uint16_t float_to_uint(double x, double x_min, double x_max, unsigned int bits);
 /// Inverse mapping of float_to_uint().
 double uint_to_float(uint16_t u, double x_min, double x_max, unsigned int bits);
 
+/// Damiao register IDs (see official manual / motorbridge damiao_registers.h).
+constexpr uint8_t kRidCtrlMode = 10;
+constexpr uint8_t kRidTimeout = 9;
+constexpr uint8_t kModeMit = 1;  ///< MIT control mode value for RID_CTRL_MODE
+/// CAN communication timeout: 500 ms in 50 µs units. If the motor receives
+/// no valid CAN frame for this period it auto-disables (safety fallback for
+/// serial-bridge disconnection, severed cable, etc.).
+constexpr uint32_t kDefaultCanTimeout = 500'000 / 50;  // = 10000
+
 /// Management frames (data = FF FF FF FF FF FF FF FC/FD/FE, frame id = CAN id).
 CanFrame make_enable_frame(uint32_t motor_id);
 CanFrame make_disable_frame(uint32_t motor_id);
 CanFrame make_set_zero_frame(uint32_t motor_id);
+
+/// Parameter write frame: writes a 32-bit value to a motor register.
+/// CAN id = 0x7FF (broadcast parameter access).
+/// Payload: [motor_id, 0x00, 0x55, reg_id, value_32LE]
+CanFrame make_parameter_write_frame(
+  uint32_t motor_id, uint8_t register_id, uint32_t value);
 
 /// MIT-mode control frame (frame id = CAN id).
 /// Layout: p[15:8] p[7:0] v[11:4] v[3:0]|kp[11:8] kp[7:0] kd[11:4]

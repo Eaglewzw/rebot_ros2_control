@@ -85,6 +85,21 @@ CanFrame make_disable_frame(uint32_t motor_id) {return make_management_frame(mot
 
 CanFrame make_set_zero_frame(uint32_t motor_id) {return make_management_frame(motor_id, 0xFE);}
 
+CanFrame make_parameter_write_frame(uint32_t motor_id, uint8_t register_id, uint32_t value)
+{
+  CanFrame frame;
+  frame.id = 0x7FF;  // broadcast parameter access
+  frame.data[0] = static_cast<uint8_t>(motor_id & 0xFF);
+  frame.data[1] = 0x00;
+  frame.data[2] = 0x55;  // opcode: write
+  frame.data[3] = register_id;
+  frame.data[4] = static_cast<uint8_t>(value & 0xFF);
+  frame.data[5] = static_cast<uint8_t>((value >> 8) & 0xFF);
+  frame.data[6] = static_cast<uint8_t>((value >> 16) & 0xFF);
+  frame.data[7] = static_cast<uint8_t>((value >> 24) & 0xFF);
+  return frame;
+}
+
 CanFrame make_mit_frame(
   uint32_t motor_id, const MotorLimits & limits, double position, double velocity, double kp,
   double kd, double torque)
