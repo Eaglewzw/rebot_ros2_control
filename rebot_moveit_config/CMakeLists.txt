@@ -10,6 +10,12 @@ install(
   DESTINATION share/${PROJECT_NAME}
 )
 
+# Install .setup_assistant for MoveItConfigsBuilder discovery
+install(
+  FILES .setup_assistant
+  DESTINATION share/${PROJECT_NAME}
+)
+
 # Test setup
 if(BUILD_TESTING)
   find_package(ament_lint_auto REQUIRED)

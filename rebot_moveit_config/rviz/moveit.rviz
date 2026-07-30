@@ -1,0 +1,49 @@
+Panels:
+  - Class: rviz_common/Displays
+    Name: Displays
+  - Class: rviz_common/Views
+    Name: Views
+Visualization Manager:
+  Global Options:
+    Background Color: 48; 48; 48
+    Fixed Frame: world
+    Frame Rate: 30
+  Displays:
+    - Class: rviz_default_plugins/Grid
+      Name: Grid
+      Plane Cell Count: 10
+      Reference Frame: world
+    - Class: rviz_default_plugins/RobotModel
+      Name: RobotModel
+      Description Topic: /robot_description
+      Visual Enabled: true
+    - Class: rviz_default_plugins/TF
+      Name: TF
+      Enabled: true
+    - Class: moveit_rviz_plugin/PlanningScene
+      Name: PlanningScene
+      Planning Scene Topic: /monitored_planning_scene
+      Scene Display Time: 0.2
+    - Class: moveit_rviz_plugin/Trajectory
+      Name: Trajectory
+      Trajectory Topic: /display_planned_path
+      Color Enabled: true
+      Error Color: 255; 0; 0
+  Tools:
+    - Class: rviz_default_plugins/Interact
+    - Class: rviz_default_plugins/MoveCamera
+    - Class: rviz_default_plugins/Select
+    - Class: rviz_default_plugins/SetInitialPose
+    - Class: rviz_default_plugins/SetGoal
+  Views:
+    Current:
+      Class: rviz_default_plugins/Orbit
+      Distance: 2.0
+      Focal Point: [0.0, 0.0, 0.5]
+      Pitch: 0.5
+      Yaw: 0.0
+Window Geometry:
+  Displays:
+    collapsed: false
+  Width: 1280
+  Height: 800
