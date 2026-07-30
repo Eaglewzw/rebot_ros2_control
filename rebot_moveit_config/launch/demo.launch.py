@@ -35,7 +35,7 @@ def generate_launch_description():
         DeclareLaunchArgument("serial_port", default_value="/dev/ttyACM0"),
     ]
 
-    # ---- URDF via xacro ----
+    # ---- URDF via xacro (single source of truth) ----
     xacro_path = PathJoinSubstitution([
         FindPackageShare("rebot_description"),
         "urdf", "rebot_b601_dm.urdf.xacro",
@@ -50,10 +50,9 @@ def generate_launch_description():
         "robot_description": ParameterValue(robot_description_content, value_type=str)
     }
 
-    # ---- MoveIt2 configs ----
+    # ---- MoveIt2 configs (SRDF, kinematics, planning, controllers, joint_limits only — NOT URDF) ----
     moveit_config = (
         MoveItConfigsBuilder("rebot_b601_dm", package_name="rebot_moveit_config")
-        .robot_description(mappings={"use_mock_hardware": use_mock_hardware})
         .robot_description_semantic()
         .robot_description_kinematics()
         .planning_pipelines()
@@ -62,6 +61,8 @@ def generate_launch_description():
         .joint_limits()
         .to_moveit_configs()
     )
+
+    # Merge URDF into moveit_config for move_group
     move_group_params = moveit_config.to_dict()
     move_group_params["robot_description"] = robot_description["robot_description"]
 
