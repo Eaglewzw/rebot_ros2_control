@@ -66,15 +66,14 @@ def generate_launch_description():
     move_group_params = moveit_config.to_dict()
     move_group_params["robot_description"] = robot_description["robot_description"]
 
-    # ---- ros2_control_node ----
+    # ---- ros2_control_node (URDF as parameter, not topic, to avoid conflicts) ----
     controllers_path = PathJoinSubstitution([
         FindPackageShare("rebot_bringup"), "config", "ros2_control_controllers.yaml"
     ])
     control_node = Node(
         package="controller_manager",
         executable="ros2_control_node",
-        parameters=[controllers_path],
-        remappings=[("~/robot_description", "/robot_description")],
+        parameters=[controllers_path, robot_description],
         output="both",
     )
 
@@ -138,6 +137,7 @@ def generate_launch_description():
         package="rviz2",
         executable="rviz2",
         arguments=["-d", rviz_config],
+        parameters=[move_group_params],
         condition=IfCondition(use_rviz),
         output="both",
     )
