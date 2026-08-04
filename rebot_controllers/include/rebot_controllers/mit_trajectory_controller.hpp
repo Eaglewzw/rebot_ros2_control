@@ -15,6 +15,7 @@
 #ifndef REBOT_CONTROLLERS__MIT_TRAJECTORY_CONTROLLER_HPP_
 #define REBOT_CONTROLLERS__MIT_TRAJECTORY_CONTROLLER_HPP_
 
+#include <atomic>
 #include <memory>
 #include <vector>
 
@@ -36,7 +37,8 @@ namespace rebot_controllers
 
 /// FollowJointTrajectory-compatible trajectory controller running the joints
 /// in Damiao MIT mode: p_des/v_des sampled from a Hermite spline, kp/kd from
-/// (runtime-tunable) parameters, t_ff = gravity feed-forward g(q).
+/// (runtime-tunable) parameters, t_ff = gravity_scale * g(q), clamped by the
+/// configured torque limit.
 /// Path/goal/goal-time tolerances follow the official JTC semantics.
 class MitTrajectoryController : public controller_interface::ControllerInterface
 {
@@ -65,7 +67,9 @@ protected:
     Trajectory trajectory;
     RealtimeGoalHandlePtr goal_handle;
     rclcpp::Time start_time;
+    rclcpp::Time within_goal_since;
     bool started{false};
+    bool within_goal_window{false};
   };
 
   rclcpp_action::GoalResponse goal_callback(
@@ -91,6 +95,7 @@ protected:
   std::vector<double> q_ref_;
   std::vector<double> qd_ref_;
   std::vector<double> q_;
+  std::vector<double> qd_;
   std::vector<double> g_tau_;
   std::vector<double> hold_position_;
   std::vector<double> start_position_;  ///< q at trajectory start, for the
@@ -98,6 +103,9 @@ protected:
                                         ///< time_from_start > 0
   size_t sample_hint_{0};
   bool holding_{true};
+  // Non-RT callbacks only request a hold. update() captures the measured pose
+  // and becomes the single writer of the realtime hold reference.
+  std::atomic_bool hold_requested_{false};
 
   MitCommandHandles command_handles_;
   JointStateHandles state_handles_;

@@ -87,6 +87,7 @@ controller_interface::CallbackReturn MitTrajectoryController::on_configure(
   q_ref_.assign(n, 0.0);
   qd_ref_.assign(n, 0.0);
   q_.assign(n, 0.0);
+  qd_.assign(n, 0.0);
   g_tau_.assign(n, 0.0);
   hold_position_.assign(n, 0.0);
   start_position_.assign(n, 0.0);
@@ -145,10 +146,15 @@ rclcpp_action::CancelResponse MitTrajectoryController::cancel_callback(
   const std::shared_ptr<GoalHandle> goal_handle)
 {
   if (rt_active_goal_ && rt_active_goal_->gh_ == goal_handle) {
-    // Replace the active trajectory by a hold (picked up in update()).
+    // Result delivery is non-RT, while update() captures the measured pose and
+    // applies the hold. Publish the request before replacing the trajectory so
+    // update() can never fall through to an activation-time hold reference.
+    hold_requested_.store(true, std::memory_order_release);
     auto hold = std::make_shared<ActiveTrajectory>();
     trajectory_buffer_.writeFromNonRT(hold);
     auto result = std::make_shared<FollowJTraj::Result>();
+    result->error_code = FollowJTraj::Result::SUCCESSFUL;
+    result->error_string = "Trajectory canceled; holding measured position";
     rt_active_goal_->setCanceled(result);
     rt_active_goal_.reset();
   }
@@ -201,18 +207,19 @@ void MitTrajectoryController::accepted_callback(std::shared_ptr<GoalHandle> goal
   fb->desired.positions.resize(n);
   fb->desired.velocities.resize(n);
   fb->actual.positions.resize(n);
+  fb->actual.velocities.resize(n);
+  fb->actual.effort.resize(n);
   // Mark the realtime handle as executing — without this every later
   // setSucceeded/setAborted call is silently ignored.
   active->goal_handle->execute();
   rt_active_goal_ = active->goal_handle;
   trajectory_buffer_.writeFromNonRT(active);
 
-  // Timer that shovels feedback/result from the RT thread to the action
-  // client (official JTC pattern).
+  // Keep this goal's non-RT pump alive through cancel/preemption. The active
+  // pointer may be reset before setCanceled()/setAborted() is delivered.
+  const auto goal_rt = active->goal_handle;
   goal_handle_timer_ = get_node()->create_wall_timer(
-    std::chrono::milliseconds(50), [this]() {
-      if (rt_active_goal_) {rt_active_goal_->runNonRealtime();}
-    });
+    std::chrono::milliseconds(50), [goal_rt]() {goal_rt->runNonRealtime();});
 }
 
 controller_interface::CallbackReturn MitTrajectoryController::on_activate(
@@ -230,6 +237,7 @@ controller_interface::CallbackReturn MitTrajectoryController::on_activate(
   }
   holding_ = true;
   trajectory_buffer_.reset();
+  hold_requested_.store(false, std::memory_order_release);
   return controller_interface::CallbackReturn::SUCCESS;
 }
 
@@ -270,6 +278,11 @@ controller_interface::return_type MitTrajectoryController::update(
 
   for (size_t i = 0; i < n; ++i) {
     q_[i] = state_handles_.position[i].get().get_value();
+    qd_[i] = state_handles_.velocity[i].get().get_value();
+  }
+
+  if (hold_requested_.exchange(false, std::memory_order_acq_rel)) {
+    hold_current_position();
   }
 
   auto active_ptr = *trajectory_buffer_.readFromRT();
@@ -324,7 +337,8 @@ controller_interface::return_type MitTrajectoryController::update(
     }
 
     if (!holding_ && past_end) {
-      // Goal tolerance / goal time tolerance.
+      // Do not declare success on a single noisy sample inside tolerance.
+      // Every joint must stay inside the goal window for goal_settle_time.
       bool within_goal = true;
       if (params_.goal_tolerance.size() == n) {
         for (size_t i = 0; i < n; ++i) {
@@ -332,16 +346,27 @@ controller_interface::return_type MitTrajectoryController::update(
           if (tol > 0.0 && std::abs(q_[i] - q_ref_[i]) > tol) {within_goal = false;}
         }
       }
+      bool goal_succeeded = false;
       if (within_goal) {
-        if (goal) {
-          auto result = std::make_shared<FollowJTraj::Result>();
-          result->error_code = FollowJTraj::Result::SUCCESSFUL;
-          goal->setSucceeded(result);
-          active.goal_handle.reset();
+        if (!active.within_goal_window) {
+          active.within_goal_since = time;
+          active.within_goal_window = true;
         }
-        for (size_t i = 0; i < n; ++i) {hold_position_[i] = q_ref_[i];}
-        holding_ = true;
-      } else if (
+        if ((time - active.within_goal_since).seconds() >= params_.goal_settle_time) {
+          if (goal) {
+            auto result = std::make_shared<FollowJTraj::Result>();
+            result->error_code = FollowJTraj::Result::SUCCESSFUL;
+            goal->setSucceeded(result);
+            active.goal_handle.reset();
+          }
+          for (size_t i = 0; i < n; ++i) {hold_position_[i] = q_ref_[i];}
+          holding_ = true;
+          goal_succeeded = true;
+        }
+      } else {
+        active.within_goal_window = false;
+      }
+      if (!goal_succeeded &&
         params_.goal_time_tolerance > 0.0 &&
         t > active.trajectory.duration() + params_.goal_time_tolerance)
       {
@@ -351,7 +376,8 @@ controller_interface::return_type MitTrajectoryController::update(
           goal->setAborted(result);
           active.goal_handle.reset();
         }
-        hold_current_position();
+        for (size_t i = 0; i < n; ++i) {hold_position_[i] = q_ref_[i];}
+        holding_ = true;
       }
     }
 
@@ -362,6 +388,10 @@ controller_interface::return_type MitTrajectoryController::update(
       std::copy(q_ref_.begin(), q_ref_.end(), fb->desired.positions.begin());
       std::copy(qd_ref_.begin(), qd_ref_.end(), fb->desired.velocities.begin());
       std::copy(q_.begin(), q_.end(), fb->actual.positions.begin());
+      std::copy(qd_.begin(), qd_.end(), fb->actual.velocities.begin());
+      for (size_t i = 0; i < n; ++i) {
+        fb->actual.effort[i] = state_handles_.effort[i].get().get_value();
+      }
       goal->setFeedback(fb);
     }
   }
@@ -381,7 +411,7 @@ controller_interface::return_type MitTrajectoryController::update(
     double tau = 0.0;
     if (use_gravity_ff_) {
       const double limit = params_.torque_limit_ratio * params_.rated_torques[i];
-      tau = std::clamp(g_tau_[i], -limit, limit);
+      tau = std::clamp(params_.gravity_scale * g_tau_[i], -limit, limit);
     }
     command_handles_.position[i].get().set_value(q_ref_[i]);
     command_handles_.velocity[i].get().set_value(qd_ref_[i]);

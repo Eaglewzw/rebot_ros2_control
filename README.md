@@ -37,7 +37,7 @@ rebot_description/   URDF/xacro 与 meshes
 rebot_hardware/      C++ 硬件插件 + 达妙协议驱动（damiao_motor_driver / serial_can_bridge）+ 单元测试
 rebot_msgs/          MitJointCommand 消息（MIT 五元组）
 rebot_controllers/   自定义控制器 ×5（MIT 直通 / 重力补偿 / MIT 轨迹 / 阻抗 / 遥操作流）+ 单元测试
-rebot_teleop_joy/    单只 Joy-Con 体感遥操（关节/末端双模式）+ 最小伺服管线 + 单元测试
+rebot_teleop_vr/     VR 手柄遥操（6DoF 末端位姿映射）+ 最小伺服管线 + 单元测试
 rebot_bringup/       bringup.launch.py、ros2_control_controllers.yaml
 rebot_moveit_config/ MoveIt2 配置（预留）
 ```
@@ -86,7 +86,39 @@ ros2 action send_goal /joint_trajectory_controller/follow_joint_trajectory \
 # 夹爪（米，单指行程 0.0 全闭 → 0.0715 全开；gripper_joint2 在 URDF 中 mimic）
 ros2 action send_goal /gripper_controller/gripper_cmd \
   control_msgs/action/GripperCommand "{command: {position: 0.05, max_effort: 5.0}}"
-```
+```bash
+
+### MoveIt 平顺性整定（空载/轻载）
+
+MoveIt 使用标准 `joint_trajectory_controller`，向达妙 MIT 硬件环发送轨迹的**位置和速度参考**；
+`kp/kd` 仍取 `rebot_b601_dm.ros2_control.xacro` 的每关节默认值，前馈力矩为零。
+`joint_limits.yaml` 是首次真机整定的保守规划上限，不是电机或机构的极限值。
+
+1. **先完成 mock 接口验证**（mock 的速度状态恒为零，不能用于评价实际平顺性）：
+   ```bash
+   ros2 launch rebot_moveit_config demo.launch.py use_mock_hardware:=true
+   ros2 control list_hardware_interfaces -v
+   ```
+   确认 `joint_trajectory_controller` 是 active，且它 claim 了六轴的 `position`、`velocity`。
+2. **真机前置条件**：先修复夹爪 `0x07` 反馈、清空工作空间、准备急停，以空载或已知轻载开始；
+   检查 `/joint_states` 持续更新且没有 CAN、反馈或电机 fault 日志。六轴控制器互斥，不能同时激活
+   `joint_trajectory_controller` 和任一自定义臂控制器。
+3. 每次真实测试先开诊断记录器，再在 RViz 中以速度/加速度缩放 `0.10` 执行一次小幅、长时长轨迹：
+   ```bash
+   ros2 run rebot_bringup jtc_trajectory_diagnostics.py \
+     --trial joint1_baseline --output ~/rebot_trials/joint1_baseline.csv
+   ```
+   CSV 包含 desired/actual 位置和速度、位置误差及 effort；终端输出最大/RMS/末端位置误差、速度峰值与采样周期。
+   Mock 测试应附加 `--mock`，脚本会标记速度指标不具物理意义。
+4. 依次进行：静止检查 → 单关节 `0.05–0.10 rad` 往返 → 固定加速度下每轮仅提高速度
+   `20–25%` → 固定已验证速度下每轮仅提高加速度 `20–25%` → 多关节代表性 MoveIt 路径。
+   每轮使用相同轨迹、保存 CSV，并只改变一个变量。
+5. 出现持续振荡、超调/误差增长、异常声音、温升、通信错误、软限位触发或任何不安全征兆时立刻停止，
+   回退到上一组安全参数。不要在同一轮同时修改 MoveIt 速度/加速度和 Xacro 中的 MIT `kp/kd`。
+   只有速度和加速度上限稳定后才逐关节微调增益：振荡先降低 `kp`；明显滞后且无振荡才小幅提高 `kp`。
+   `joint1–3` 的 `kd=5` 已达到当前 MIT 编码范围上限，不能再增加。
+
+最终只将经过多次重复试验、且保留安全裕量的速度/加速度和增益写回配置。
 
 ## 🎛️ 自定义控制器（rebot_controllers）
 
@@ -117,25 +149,6 @@ ros2 action send_goal /gripper_controller/gripper_cmd \
   不受 controller_manager 100 Hz 限制，推荐默认；software 闭环受更新周期与总线延迟限制，
   高刚度易振荡，但增益不受 MIT 编码范围（kp≤500/kd≤5）约束。真机实测结论待阶段 5 补充。
 
-## 🎮 Joy-Con 体感遥操（rebot_teleop_joy）
-
-单只 Joy-Con（右手柄优先、左手柄自动回退）以 IMU 姿态 + 摇杆 + 按键遥操整臂，
-两种模式在 launch 时选定：
-
-```bash
-pip install --user hidapi pyglm scipy numpy placo    # 非 rosdep 依赖；placo 为末端 QP IK
-ros2 launch rebot_teleop_joy joy_teleop.launch.py teleop_mode:=joint       # 关节遥操
-ros2 launch rebot_teleop_joy joy_teleop.launch.py teleop_mode:=cartesian   # 末端遥操
-```
-
-- **ZR/ZL 是 deadman 兼离合**：按下锚定、按住跟踪、松开立即冻结；"松开-转手-再按下"
-  完成重锚定，解决手腕活动范围问题。
-- **启动强制 IMU 标定**：把手柄平放桌面静置约 2 秒，标定完成前拒绝一切运动命令。
-- **末端 IK 对齐 JoyReBot**：默认 PlaCo QP（关节/速度硬约束，位置/姿态权重
-  100/0.35）；缺少 PlaCo 时自动回退到加权 PyKDL DLS。
-- 配对流程、左右手柄双模式**可打印按键速查卡**、索引实测方法、安全语义表与设计决策记录
-  见 [rebot_teleop_joy/README.md](rebot_teleop_joy/README.md)。
-- IMU 获取部分改编自 [Eaglewzw/JoyReBot](https://github.com/Eaglewzw/JoyReBot)（vendor 目录）。
 
 ## 🔌 串口权限
 
@@ -153,19 +166,6 @@ sudo apt remove brltty
 3. 若个别关节零位有固定偏差，在 `rebot_description/urdf/rebot_b601_dm.ros2_control.xacro`
    对应关节加 `offset="<弧度>"`（motor = joint × reduction + offset），无需重新烧录零点。
 
-## ⚠️ 首次真机测试流程（务必按序）
-
-1. **悬空 / 拆负载**，接好急停电源开关；确认 `ls /dev/ttyACM*` 存在且未被占用。
-2. 编辑 `rebot_b601_dm.ros2_control.xacro`，把所有关节 kp 临时调低（如 4340P→20，4310→5），
-   重新 `colcon build`。
-3. 启动真机模式，观察日志中每个电机 `enabled at <当前位置>`；激活时命令已与当前位置同步，
-   不应有任何跳动。
-4. 单关节小幅轨迹（±0.1 rad）逐一验证方向与软限位；方向反了在该关节加
-   `reduction="-1.0"`。
-5. 恢复默认 kp/kd，再做多关节联动与夹爪开合。
-6. `Ctrl+C` 退出：插件在 `on_deactivate/on_shutdown/析构` 中逐电机发送失能帧（0xFD），
-   电机应变为红灯（失能）。通信中断超过 `comm_error_threshold`（默认 10 周期）会自动
-   触发 `on_error` 安全停机。
 
 ## 📋 与官方资料差异记录
 
@@ -187,8 +187,8 @@ sudo apt remove brltty
 ## ⚠️ 已知限制
 
 - 仅实现达妙（DM）版本；Robstride（RS 版）可通过替换协议层（`damiao_motor_driver`）扩展。
-- MIT 模式仅下发位置 + kp/kd（期望速度与前馈扭矩置 0）；`effort` 命令接口留有扩展点。
-- `rebot_moveit_config` 尚未配置（可选阶段）。
+- 标准 `joint_trajectory_controller` 向 MIT 环下发位置和速度参考；`kp/kd` 使用 Xacro 默认值，前馈扭矩为零。
+- `rebot_moveit_config` 已提供标准 JTC 的 MoveIt2 规划与执行配置；真实速度、加速度和增益仍须按“MoveIt 平顺性整定”流程验证。
 - 真机联调（阶段 4）尚未在实机上执行，首次上电请严格按上文流程。
 
 ## 📄 License

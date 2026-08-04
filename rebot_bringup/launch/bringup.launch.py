@@ -17,7 +17,7 @@
 #
 # Launches the full ros2_control pipeline: controller_manager with the
 # rebot hardware plugin (or mock components), joint state broadcasting,
-# trajectory + gripper controllers, and RViz visualisation.
+# MIT trajectory + gripper controllers, and RViz visualisation.
 #
 # Usage:
 #   Mock (default):  ros2 launch rebot_bringup bringup.launch.py
@@ -127,10 +127,13 @@ def generate_launch_description():
         output="both",
     )
 
-    joint_trajectory_spawner = Node(
+    # MIT trajectory control is the default arm controller. It supplies the
+    # full Damiao MIT tuple and gravity feed-forward; MoveIt integration is
+    # intentionally handled later by rebot_moveit_config.
+    mit_trajectory_spawner = Node(
         package="controller_manager",
         executable="spawner",
-        arguments=["joint_trajectory_controller", "--activate"],
+        arguments=["mit_trajectory_controller", "--activate"],
         output="both",
     )
 
@@ -141,10 +144,10 @@ def generate_launch_description():
         output="both",
     )
 
-    # Custom MIT-mode controllers, loaded inactive. Activate exactly one arm
+    # Other MIT-mode controllers are loaded inactive. Activate exactly one arm
     # controller at a time, e.g.:
     #   ros2 control switch_controllers \
-    #       --deactivate joint_trajectory_controller \
+    #       --deactivate mit_trajectory_controller \
     #       --activate gravity_compensation_controller
     custom_controllers_spawner = Node(
         package="controller_manager",
@@ -152,7 +155,6 @@ def generate_launch_description():
         arguments=[
             "mit_joint_controller",
             "gravity_compensation_controller",
-            "mit_trajectory_controller",
             "joint_impedance_controller",
             "teleop_stream_controller",
             "--inactive",
@@ -177,7 +179,7 @@ def generate_launch_description():
             controller_manager_node,
             robot_state_publisher_node,
             joint_state_spawner,
-            joint_trajectory_spawner,
+            mit_trajectory_spawner,
             gripper_spawner,
             custom_controllers_spawner,
             rviz_node,

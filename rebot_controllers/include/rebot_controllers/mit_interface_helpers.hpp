@@ -112,13 +112,14 @@ struct MitCommandHandles
   }
 };
 
-/// Ordered position/velocity state handles.
+/// Ordered position/velocity/effort state handles.
 struct JointStateHandles
 {
   using StateRef = std::reference_wrapper<hardware_interface::LoanedStateInterface>;
 
   std::vector<StateRef> position;
   std::vector<StateRef> velocity;
+  std::vector<StateRef> effort;
 
   bool assign(
     std::vector<hardware_interface::LoanedStateInterface> & state_interfaces,
@@ -126,28 +127,33 @@ struct JointStateHandles
   {
     position.clear();
     velocity.clear();
+    effort.clear();
     return controller_interface::get_ordered_interfaces(
       state_interfaces, joints, hardware_interface::HW_IF_POSITION, position) &&
            controller_interface::get_ordered_interfaces(
-      state_interfaces, joints, hardware_interface::HW_IF_VELOCITY, velocity);
+      state_interfaces, joints, hardware_interface::HW_IF_VELOCITY, velocity) &&
+           controller_interface::get_ordered_interfaces(
+      state_interfaces, joints, hardware_interface::HW_IF_EFFORT, effort);
   }
 
   void release()
   {
     position.clear();
     velocity.clear();
+    effort.clear();
   }
 };
 
-/// State-interface name list (position + velocity).
+/// State-interface name list (position + velocity + effort).
 inline std::vector<std::string> pos_vel_state_interface_names(
   const std::vector<std::string> & joints)
 {
   std::vector<std::string> names;
-  names.reserve(joints.size() * 2);
+  names.reserve(joints.size() * 3);
   for (const auto & joint : joints) {
     names.push_back(joint + "/" + hardware_interface::HW_IF_POSITION);
     names.push_back(joint + "/" + hardware_interface::HW_IF_VELOCITY);
+    names.push_back(joint + "/" + hardware_interface::HW_IF_EFFORT);
   }
   return names;
 }

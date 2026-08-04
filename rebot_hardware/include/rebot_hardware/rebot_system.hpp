@@ -37,6 +37,12 @@ namespace rebot_hardware
 /// position/velocity/effort ones).
 constexpr char HW_IF_KP[] = "kp";
 constexpr char HW_IF_KD[] = "kd";
+// Read-only per-joint feedback exported through DynamicJointState. These do
+// not affect the Damiao command frame or any motor register.
+constexpr char HW_IF_MOS_TEMPERATURE[] = "mos_temperature";
+constexpr char HW_IF_ROTOR_TEMPERATURE[] = "rotor_temperature";
+constexpr char HW_IF_FAULT_CODE[] = "fault_code";
+constexpr char HW_IF_MISSED_REPLIES[] = "missed_replies";
 
 /// ros2_control SystemInterface for the Seeed reBot Arm B601-DM
 /// (Damiao DM-J4310 / DM-J4340P motors behind a USB-CAN serial bridge).
@@ -120,6 +126,10 @@ private:
   std::vector<double> hw_states_position_;
   std::vector<double> hw_states_velocity_;
   std::vector<double> hw_states_effort_;
+  std::vector<double> hw_states_mos_temperature_;
+  std::vector<double> hw_states_rotor_temperature_;
+  std::vector<double> hw_states_fault_code_;
+  std::vector<double> hw_states_missed_replies_;
 
   // Consecutive write cycles without feedback, per motor.
   std::vector<unsigned int> missed_replies_;

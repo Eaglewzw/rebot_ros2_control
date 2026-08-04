@@ -1,36 +1,39 @@
 joint_limits:
+  # Initial conservative envelope for empty/light-payload real-arm commissioning.
+  # These are MoveIt planning limits, not mechanical or motor protocol limits.
+  # Raise only after recorded, staged hardware trials; change one variable at a time.
   joint1:
     has_velocity_limits: true
-    max_velocity: 50.0
+    max_velocity: 0.40
     has_acceleration_limits: true
-    max_acceleration: 100.0
+    max_acceleration: 0.80
   joint2:
     has_velocity_limits: true
-    max_velocity: 50.0
+    max_velocity: 0.40
     has_acceleration_limits: true
-    max_acceleration: 100.0
+    max_acceleration: 0.80
   joint3:
     has_velocity_limits: true
-    max_velocity: 50.0
+    max_velocity: 0.40
     has_acceleration_limits: true
-    max_acceleration: 100.0
+    max_acceleration: 0.80
   joint4:
     has_velocity_limits: true
-    max_velocity: 200.0
+    max_velocity: 0.60
     has_acceleration_limits: true
-    max_acceleration: 600.0
+    max_acceleration: 1.20
   joint5:
     has_velocity_limits: true
-    max_velocity: 200.0
+    max_velocity: 0.60
     has_acceleration_limits: true
-    max_acceleration: 600.0
+    max_acceleration: 1.20
   joint6:
     has_velocity_limits: true
-    max_velocity: 200.0
+    max_velocity: 0.60
     has_acceleration_limits: true
-    max_acceleration: 600.0
+    max_acceleration: 1.20
   gripper_joint1:
     has_velocity_limits: true
-    max_velocity: 15.0
+    max_velocity: 0.03
     has_acceleration_limits: true
-    max_acceleration: 30.0
+    max_acceleration: 0.1

@@ -14,7 +14,12 @@
   <depend>rebot_controllers</depend>
   <depend>rebot_moveit_config</depend>
   <depend>controller_manager</depend>
+  <depend>control_msgs</depend>
+  <depend>action_msgs</depend>
+  <depend>rclpy</depend>
   <depend>robot_state_publisher</depend>
+  <depend>sensor_msgs</depend>
+  <depend>trajectory_msgs</depend>
   <depend>joint_state_publisher_gui</depend>
   <depend>rviz2</depend>
   <depend>ros2launch</depend>

@@ -20,8 +20,10 @@ arm:
     - PRMstar
   projection_evaluator: joints(joint1,joint2)
   longest_valid_segment_fraction: 0.005
-  max_velocity_scaling_factor: 1.0
-  max_acceleration_scaling_factor: 1.0
+  # Scaling limits each plan request; joint_limits.yaml supplies the physical
+  # commissioning envelope. MIT kp/kd are separate hardware-loop parameters.
+  max_velocity_scaling_factor: 0.20
+  max_acceleration_scaling_factor: 0.20
 
   RRTConnect:
     type: geometric::RRTConnect

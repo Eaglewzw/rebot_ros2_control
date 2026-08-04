@@ -1,0 +1,31 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(colcon build *)",
+      "Bash(python3 *)",
+      "Bash(udevadm info *)",
+      "Bash(lsusb)",
+      "Bash(dmesg)",
+      "WebFetch(domain:raw.githubusercontent.com)",
+      "Bash(gh repo *)",
+      "Bash(gh api *)",
+      "Bash(curl -sL 'https://api.github.com/repos/Seeed-Projects/reBotArmController_ROS2/contents/src/rebotarm_bringup/rebotarm_bringup/')",
+      "Bash(fuser /dev/ttyACM0)",
+      "Bash(fuser -k /dev/ttyACM0)",
+      "Bash(git add *)",
+      "Bash(git commit -m 'fix: set MIT control mode and CAN timeout before motor enable *)",
+      "Bash(apt-cache search *)",
+      "Bash(sudo apt install -y ros-humble-rqt-joint-trajectory-controller 2>&1)",
+      "Bash(git -C /home/verser/CPP/rebot_ros2_control/.claude/worktrees/agent-af3f441972c6c6ebc status --short)",
+      "Bash(dpkg -L ros-humble-rqt-controller-manager)",
+      "Bash(colcon test *)",
+      "Bash(colcon test-result *)",
+      "Bash(ctest -R 'copyright|flake8' --output-on-failure)",
+      "Bash(git diff *)",
+      "Read(//tmp/**)",
+      "Bash(ros2 control *)",
+      "Bash(git checkout *)",
+      "Bash(git commit *)"
+    ]
+  }
+}

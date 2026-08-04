@@ -83,6 +83,10 @@ hardware_interface::CallbackReturn ReBotSystemHardware::on_init(
   hw_states_position_.assign(n, 0.0);
   hw_states_velocity_.assign(n, 0.0);
   hw_states_effort_.assign(n, 0.0);
+  hw_states_mos_temperature_.assign(n, std::numeric_limits<double>::quiet_NaN());
+  hw_states_rotor_temperature_.assign(n, std::numeric_limits<double>::quiet_NaN());
+  hw_states_fault_code_.assign(n, 0.0);
+  hw_states_missed_replies_.assign(n, 0.0);
   missed_replies_.assign(n, 0);
 
   for (size_t i = 0; i < n; ++i) {
@@ -327,6 +331,14 @@ std::vector<hardware_interface::StateInterface> ReBotSystemHardware::export_stat
       info_.joints[i].name, hardware_interface::HW_IF_VELOCITY, &hw_states_velocity_[i]);
     state_interfaces.emplace_back(
       info_.joints[i].name, hardware_interface::HW_IF_EFFORT, &hw_states_effort_[i]);
+    state_interfaces.emplace_back(
+      info_.joints[i].name, HW_IF_MOS_TEMPERATURE, &hw_states_mos_temperature_[i]);
+    state_interfaces.emplace_back(
+      info_.joints[i].name, HW_IF_ROTOR_TEMPERATURE, &hw_states_rotor_temperature_[i]);
+    state_interfaces.emplace_back(
+      info_.joints[i].name, HW_IF_FAULT_CODE, &hw_states_fault_code_[i]);
+    state_interfaces.emplace_back(
+      info_.joints[i].name, HW_IF_MISSED_REPLIES, &hw_states_missed_replies_[i]);
   }
   return state_interfaces;
 }
@@ -358,7 +370,11 @@ int ReBotSystemHardware::apply_feedback(const damiao::CanFrame & frame)
     hw_states_position_[i] = (fb.position - cfg.offset) / cfg.reduction;
     hw_states_velocity_[i] = fb.velocity / cfg.reduction;
     hw_states_effort_[i] = fb.torque * cfg.reduction;
+    hw_states_mos_temperature_[i] = fb.t_mos;
+    hw_states_rotor_temperature_[i] = fb.t_rotor;
+    hw_states_fault_code_[i] = static_cast<double>(fb.error);
     missed_replies_[i] = 0;
+    hw_states_missed_replies_[i] = 0.0;
     if (damiao::is_fault(fb.error)) {
       if (error_log_counter_++ % 100 == 0) {
         RCLCPP_ERROR(
@@ -430,6 +446,7 @@ hardware_interface::return_type ReBotSystemHardware::write(
       return hardware_interface::return_type::ERROR;
     }
     ++missed_replies_[i];
+    hw_states_missed_replies_[i] = static_cast<double>(missed_replies_[i]);
   }
   return hardware_interface::return_type::OK;
 }

@@ -15,13 +15,17 @@ mit_trajectory_controller:
     type: bool
     default_value: true
     description: "Add g(q) as feed-forward torque."
+  gravity_scale:
+    type: double
+    default_value: 0.3
+    description: "Overall scaling of g(q). Start near 0.3 on hardware and tune gradually toward 1.0."
   rated_torques:
     type: double_array
     default_value: []
     description: "Rated torque per joint [N*m], clamps the feed-forward. Same length as joints."
   torque_limit_ratio:
     type: double
-    default_value: 0.5
+    default_value: 0.25
     description: "Feed-forward clamp: |tau_i| <= ratio * rated_torques[i]."
   path_tolerance:
     type: double_array
@@ -35,6 +39,10 @@ mit_trajectory_controller:
     type: double
     default_value: 0.5
     description: "Extra seconds after the trajectory end to reach the goal tolerance. 0 = unlimited."
+  goal_settle_time:
+    type: double
+    default_value: 0.3
+    description: "Seconds all joints must continuously remain inside goal tolerance before success."
   base_link:
     type: string
     default_value: "base_link"

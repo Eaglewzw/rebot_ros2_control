@@ -1,4 +1,18 @@
 #!/usr/bin/env python3
+# Copyright 2026 Eaglewzw
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
 # ==============================================================================
 # reBot MoveIt2 demo launch (standalone, includes ros2_control + move_group)
 #
@@ -8,8 +22,16 @@
 # ==============================================================================
 
 from launch import LaunchDescription
-from launch.actions import DeclareLaunchArgument, TimerAction
+from launch.actions import (
+    DeclareLaunchArgument,
+    EmitEvent,
+    LogInfo,
+    RegisterEventHandler,
+    TimerAction,
+)
 from launch.conditions import IfCondition
+from launch.event_handlers import OnProcessExit
+from launch.events import Shutdown
 from launch.substitutions import (
     Command,
     FindExecutable,
@@ -50,7 +72,7 @@ def generate_launch_description():
         "robot_description": ParameterValue(robot_description_content, value_type=str)
     }
 
-    # ---- MoveIt2 configs (SRDF, kinematics, planning, controllers, joint_limits only — NOT URDF) ----
+    # ---- MoveIt2 configs (all except URDF, which is generated above) ----
     moveit_config = (
         MoveItConfigsBuilder("rebot_b601_dm", package_name="rebot_moveit_config")
         .robot_description_semantic()
@@ -76,6 +98,20 @@ def generate_launch_description():
         parameters=[controllers_path, robot_description],
         output="both",
     )
+    control_node_exit_handler = RegisterEventHandler(
+        OnProcessExit(
+            target_action=control_node,
+            on_exit=[
+                LogInfo(
+                    msg="ERROR: ros2_control_node exited; shutting down MoveIt because "
+                    "current robot state and trajectory execution are unavailable."
+                ),
+                EmitEvent(
+                    event=Shutdown(reason="ros2_control_node exited")
+                ),
+            ],
+        )
+    )
 
     # ---- Controller spawners (delayed so ros2_control_node is ready first) ----
     spawner_delay = 3.0
@@ -90,13 +126,13 @@ def generate_launch_description():
             )
         ],
     )
-    jtc_spawner = TimerAction(
+    mit_trajectory_spawner = TimerAction(
         period=spawner_delay,
         actions=[
             Node(
                 package="controller_manager",
                 executable="spawner",
-                arguments=["joint_trajectory_controller", "--activate"],
+                arguments=["mit_trajectory_controller", "--activate"],
                 output="both",
             )
         ],
@@ -141,16 +177,20 @@ def generate_launch_description():
         condition=IfCondition(use_rviz),
         output="both",
     )
+    moveit_delay = TimerAction(
+        period=5.0,
+        actions=[move_group_node, rviz_node],
+    )
 
     return LaunchDescription(
         declared_arguments
         + [
+            control_node_exit_handler,
             control_node,
             rsp_node,
-            move_group_node,
-            rviz_node,
+            moveit_delay,
             joint_state_spawner,
-            jtc_spawner,
+            mit_trajectory_spawner,
             gripper_spawner,
         ]
     )
